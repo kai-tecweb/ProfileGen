@@ -37,15 +37,31 @@ git log --oneline
 
 ## リモートリポジトリの設定
 
-### GitHubを使用する場合
+### 方法1: 対話式スクリプトを使用（推奨）
 
-#### 1. GitHubでリポジトリを作成
+```bash
+# 対話式スクリプトを実行
+bash setup-remote.sh
+```
 
-1. GitHubにログイン
-2. 新しいリポジトリを作成（`ProfileGen`という名前など）
-3. **「Initialize this repository with a README」はチェックしない**
+スクリプトが自動で以下を案内します：
+- リモートリポジトリの種類を選択（GitHub/GitLab/Bitbucket）
+- ユーザー名とリポジトリ名を入力
+- リモートリポジトリを自動設定
 
-#### 2. リモートリポジトリを追加
+### 方法2: 手動で設定
+
+#### GitHubを使用する場合
+
+##### 1. GitHubでリポジトリを作成
+
+1. [GitHub](https://github.com)にログイン
+2. 右上の「+」→「New repository」をクリック
+3. リポジトリ名を入力（例: `ProfileGen`）
+4. **「Initialize this repository with a README」はチェックしない**
+5. 「Create repository」をクリック
+
+##### 2. リモートリポジトリを追加
 
 ```bash
 # SSHを使用する場合（推奨）
@@ -58,10 +74,10 @@ git remote add origin https://github.com/your-username/ProfileGen.git
 git remote -v
 ```
 
-#### 3. 初回プッシュ
+##### 3. 初回プッシュ
 
 ```bash
-# メインブランチ名を確認・設定
+# メインブランチ名を確認・設定（既にmainなので不要な場合あり）
 git branch -M main
 
 # 初回プッシュ
