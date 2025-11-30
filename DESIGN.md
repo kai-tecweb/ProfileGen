@@ -1,0 +1,2128 @@
+# ProfileGen（プロフィールメーカー）設計書
+
+## 目次
+1. [システムアーキテクチャ](#1-システムアーキテクチャ)
+2. [データベース設計](#2-データベース設計)
+3. [機能設計](#3-機能設計)
+4. [API設計](#4-api設計)
+5. [画面設計](#5-画面設計)
+6. [セキュリティ設計](#6-セキュリティ設計)
+7. [パフォーマンス設計](#7-パフォーマンス設計)
+8. [デプロイ設計](#8-デプロイ設計)
+9. [開発計画](#9-開発計画)
+10. [コーディング規約](#10-コーディング規約)
+
+---
+
+## 1. システムアーキテクチャ
+
+### 1.1 全体構成
+
+```
+┌─────────────────┐
+│   ユーザー      │
+│   (ブラウザ)    │
+│   React + Inertia│
+└────────┬────────┘
+         │ HTTP/HTTPS
+         ↓
+┌─────────────────────────────────────┐
+│   さくらレンタルサーバー            │
+│  ┌───────────────────────────────┐ │
+│  │  Laravel Application          │ │
+│  │  - Inertia.js Server          │ │
+│  │  - Controllers                │ │
+│  │  - Models                     │ │
+│  │  - Services                   │ │
+│  └───────────┬───────────────────┘ │
+│              │                      │
+│  ┌───────────▼───────────────────┐ │
+│  │  MySQL Database               │ │
+│  └───────────────────────────────┘ │
+└───────────┬─────────────────────────┘
+            │
+            │ HTTPS API Request
+            ↓
+┌───────────────────────────┐
+│  Google Gemini API        │
+│  (gemini-1.5-pro/flash)   │
+└───────────────────────────┘
+```
+
+### 1.2 技術スタック詳細
+
+#### バックエンド
+- **フレームワーク**: Laravel 12
+- **PHP**: 8.2 以上
+- **認証**: Laravel Breeze（Inertia.js対応）
+- **ORM**: Eloquent ORM
+- **バリデーション**: Laravel Validation（FormRequest使用）
+
+#### フロントエンド
+- **フレームワーク**: React 18+
+- **SPAフレームワーク**: Inertia.js
+- **言語**: TypeScript
+- **UIフレームワーク**: Tailwind CSS
+- **ビルドツール**: Vite
+- **コード品質**: ESLint + Prettier
+
+#### データベース
+- **DBMS**: MySQL 8.0
+- **文字コード**: utf8mb4
+- **照合順序**: utf8mb4_unicode_ci
+
+#### 外部API
+- **AI API**: Google Gemini API
+- **モデル**: gemini-1.5-pro または gemini-1.5-flash
+- **PHP SDK**: google/generative-ai-php
+
+#### 追加ライブラリ
+- **HTMLパース**: symfony/dom-crawler
+- **CSSセレクター**: symfony/css-selector（dom-crawlerの依存）
+
+#### 開発ツール
+- **ビルドツール**: Vite
+- **コード品質**: ESLint + Prettier（フロントエンド）、PHPStan（バックエンド）
+
+---
+
+## 2. データベース設計
+
+### 2.1 ER図
+
+```
+┌──────────┐         ┌──────────┐         ┌──────────┐
+│  users   │         │ articles │         │ clients  │
+├──────────┤         ├──────────┤         ├──────────┤
+│ id (PK)  │         │ id (PK)  │         │ id (PK)  │
+│ name     │         │ title    │         │ name     │
+│ email    │         │ content  │         │ company  │
+│ password │         │ created  │         │ memo     │
+│ created  │         │ updated  │         │ created  │
+│ updated  │         └──────────┘         │ updated  │
+└──────────┘                              └────┬─────┘
+                                                │
+                                                │ 1:N
+                                                ↓
+                                        ┌──────────────┐
+                                        │  proposals   │
+                                        ├──────────────┤
+                                        │ id (PK)      │
+                                        │ client_id(FK)│
+                                        │ x_profile    │
+                                        │ instagram_   │
+                                        │   profile    │
+                                        │ coconala_    │
+                                        │   profile    │
+                                        │ product_     │
+                                        │   design     │
+                                        │ created      │
+                                        │ updated      │
+                                        └──────────────┘
+```
+
+### 2.2 テーブル定義詳細
+
+#### users（ユーザー）
+管理者アカウントを管理するテーブル
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | ユーザーID |
+| name | VARCHAR(255) | NOT NULL | ユーザー名 |
+| email | VARCHAR(255) | NOT NULL, UNIQUE | メールアドレス |
+| email_verified_at | TIMESTAMP | NULLABLE | メール認証日時 |
+| password | VARCHAR(255) | NOT NULL | ハッシュ化されたパスワード |
+| remember_token | VARCHAR(100) | NULLABLE | ログイン記憶トークン |
+| created_at | TIMESTAMP | NULLABLE | 作成日時 |
+| updated_at | TIMESTAMP | NULLABLE | 更新日時 |
+
+**インデックス**
+- PRIMARY KEY (id)
+- UNIQUE KEY (email)
+
+#### articles（記事）
+ブログ記事を保存するテーブル
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | 記事ID |
+| title | VARCHAR(255) | NOT NULL | タイトル（最大255文字） |
+| content | LONGTEXT | NOT NULL | 本文（最大約4GB、10万文字想定） |
+| created_at | TIMESTAMP | NULLABLE | 作成日時 |
+| updated_at | TIMESTAMP | NULLABLE | 更新日時 |
+
+**インデックス**
+- PRIMARY KEY (id)
+- INDEX idx_created_at (created_at) - 作成日時でのソート用
+
+**備考**
+- contentはLONGTEXT型で約10万文字の記事を想定
+- 削除は物理削除（論理削除は実装しない）
+
+#### clients（クライアント）
+クライアント情報を管理するテーブル
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | クライアントID |
+| name | VARCHAR(255) | NOT NULL | クライアント名（必須） |
+| company | VARCHAR(255) | NULLABLE | 会社名（任意） |
+| memo | TEXT | NULLABLE | クライアント情報・特徴（任意、最大65535文字） |
+| questionnaire_text | TEXT | NULLABLE | 送付した質問テキスト（参照用、任意） |
+| answers_text | TEXT | NULLABLE | クライアントからのヒアリング回答（フリーテキスト、必須） |
+| created_at | TIMESTAMP | NULLABLE | 作成日時 |
+| updated_at | TIMESTAMP | NULLABLE | 更新日時 |
+
+**インデックス**
+- PRIMARY KEY (id)
+- INDEX idx_created_at (created_at) - 作成日時でのソート用
+
+**備考**
+- 削除は物理削除（CASCADE削除で関連proposalsも削除）
+- `memo`: クライアントの人物像（年齢層、性格、好み、ビジネススタイル、背景など）を記録（任意、提案生成時に活用）
+- `questionnaire_text`: 実際に送った質問を記録（任意）
+- `answers_text`: クライアントから返ってきた回答テキストを丸ごと保存（フリーテキスト、提案生成に必須）
+
+#### proposals（提案）
+生成された提案を保存するテーブル
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | 提案ID |
+| client_id | BIGINT UNSIGNED | NOT NULL, FOREIGN KEY | クライアントID（clients.id参照） |
+| x_profile | TEXT | NOT NULL | X用プロフィール（160文字想定だが拡張対応） |
+| instagram_profile | TEXT | NOT NULL | Instagram用プロフィール（150文字想定だが拡張対応） |
+| coconala_profile | TEXT | NOT NULL | ココナラ用プロフィール |
+| product_design | TEXT | NOT NULL | 商品設計案（詳細な提案文） |
+| created_at | TIMESTAMP | NULLABLE | 生成日時 |
+| updated_at | TIMESTAMP | NULLABLE | 更新日時 |
+
+**インデックス**
+- PRIMARY KEY (id)
+- FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE CASCADE
+- INDEX idx_client_id (client_id) - クライアント別の検索用
+- INDEX idx_created_at (created_at) - 生成日時でのソート用
+
+**備考**
+- client_idのCASCADE削除により、クライアント削除時に自動削除
+- すべてのプロフィール項目はTEXT型で柔軟に対応
+
+#### questions（質問マスター）
+システム全体で共通の質問リストを管理するテーブル
+
+| カラム名 | 型 | 制約 | 説明 |
+|---------|-----|------|------|
+| id | BIGINT UNSIGNED | PRIMARY KEY, AUTO_INCREMENT | 質問ID |
+| question | TEXT | NOT NULL | 質問文 |
+| sort_order | INT | NOT NULL, DEFAULT 0 | 表示順 |
+| created_at | TIMESTAMP | NULLABLE | 作成日時 |
+| updated_at | TIMESTAMP | NULLABLE | 更新日時 |
+
+**インデックス**
+- PRIMARY KEY (id)
+- INDEX idx_sort_order (sort_order) - 表示順でのソート用
+
+**備考**
+- 質問はシステム全体で共通（全クライアント同じ質問を使用）
+- sort_orderで表示順を制御
+- 質問を変更しても既存クライアントの回答には影響しない
+
+### 2.3 マイグレーションファイル構造
+
+```
+database/migrations/
+├── 0001_01_01_000000_create_users_table.php (Laravel Breeze)
+├── 0001_01_01_000001_create_cache_table.php
+├── 0001_01_01_000002_create_jobs_table.php
+├── YYYY_MM_DD_HHMMSS_create_articles_table.php
+├── YYYY_MM_DD_HHMMSS_create_clients_table.php
+├── YYYY_MM_DD_HHMMSS_create_proposals_table.php
+├── YYYY_MM_DD_HHMMSS_create_questions_table.php
+└── YYYY_MM_DD_HHMMSS_add_questionnaire_to_clients_table.php
+```
+
+---
+
+## 3. 機能設計
+
+### 3.1 認証機能
+
+#### 3.1.1 ログイン
+- **ルート**: `GET/POST /login`
+- **コントローラー**: `App\Http\Controllers\Auth\AuthenticatedSessionController`
+- **ビュー**: `resources/views/auth/login.blade.php`
+- **機能**:
+  - メールアドレスとパスワードによる認証
+  - ログイン状態の保持（remember me）
+  - 認証後はダッシュボードへリダイレクト
+  - 未認証アクセスはログイン画面へリダイレクト
+
+#### 3.1.2 ログアウト
+- **ルート**: `POST /logout`
+- **コントローラー**: `App\Http\Controllers\Auth\AuthenticatedSessionController`
+- **機能**: セッションを破棄し、ログイン画面へリダイレクト
+
+#### 3.1.3 初回セットアップ
+- **手動実行**: `php artisan migrate:fresh --seed`
+- **シーダー**: `database/seeders/DatabaseSeeder.php`
+- **初期ユーザー作成**: 環境変数から読み込み（開発環境のみ）
+
+### 3.2 記事管理機能
+
+#### 3.2.1 記事一覧
+- **ルート**: `GET /articles`
+- **コントローラー**: `App\Http\Controllers\ArticleController@index`
+- **ビュー**: `resources/views/articles/index.blade.php`
+- **機能**:
+  - 全記事を取得（ページネーション: 20件/ページ）
+  - 作成日時の降順でソート
+  - テーブル形式で表示（タイトル、作成日時）
+  - 各行に編集・削除ボタン
+  - 新規登録ボタン
+
+#### 3.2.2 記事登録
+- **ルート**: `GET /articles/create`, `POST /articles`
+- **コントローラー**: `App\Http\Controllers\ArticleController@create`, `store`
+- **ビュー**: `resources/views/articles/create.blade.php`
+- **バリデーション**:
+  - `title`: required, string, max:255
+  - `content`: required, string
+  - `auto_extract`: nullable, boolean
+- **機能**:
+  - タイトルと本文を入力（本文はtextareaで大きなサイズ: rows="25", min-height: 500px）
+  - **HTMLから本文を自動抽出する**チェックボックス機能
+    - チェックON: HTMLソース全体を貼り付けると、本文部分のみを自動抽出
+    - チェックOFF: 入力内容をそのまま保存（通常モード、デフォルト）
+  - HTMLパース処理: symfony/dom-crawlerを使用
+    - 抽出優先順位: `<article>`, `.post_content`, `#main_content`, `<main>`, `.entry-content`, `<body>`
+    - 除外要素: `<script>`, `<style>`, `<nav>`, `<header>`, `<footer>`, `<aside>`
+  - バリデーションエラー時はエラーメッセージ表示
+  - 保存成功時は一覧画面へリダイレクト（「続けて登録」ボタンで連続登録可能）
+- **データの扱い**:
+  - 本文にHTMLタグが含まれていてもそのまま保存（エスケープしない）
+  - 表示時はBladeの自動エスケープ（`{{ }}`）を使用
+  - Gemini API送信時もHTMLタグごと送信可能（AIが理解可能）
+
+#### 3.2.3 記事編集
+- **ルート**: `GET /articles/{id}/edit`, `PUT /articles/{id}`
+- **コントローラー**: `App\Http\Controllers\ArticleController@edit`, `update`
+- **ビュー**: `resources/views/articles/edit.blade.php`
+- **バリデーション**: 登録時と同等（`auto_extract`含む）
+- **機能**: 
+  - 既存記事の内容を編集可能
+  - HTMLパース機能も利用可能（初回取り込み時と同様）
+  - 本文入力欄: rows="25", min-height: 500px
+
+#### 3.2.4 記事削除
+- **ルート**: `DELETE /articles/{id}`
+- **コントローラー**: `App\Http\Controllers\ArticleController@destroy`
+- **機能**:
+  - JavaScriptで確認ダイアログ表示
+  - 削除後は一覧画面へリダイレクト
+  - 物理削除（論理削除なし）
+
+### 3.3 クライアント管理機能
+
+#### 3.3.1 クライアント一覧
+- **ルート**: `GET /clients`
+- **コントローラー**: `App\Http\Controllers\ClientController@index`
+- **ビュー**: `resources/views/clients/index.blade.php`
+- **機能**:
+  - 全クライアントを取得（ページネーション: 20件/ページ）
+  - 作成日時の降順でソート
+  - テーブル形式で表示（名前、会社名）
+  - 各行に詳細・編集・削除・提案生成ボタン
+  - 新規登録ボタン
+
+#### 3.3.2 クライアント登録
+- **ルート**: `GET /clients/create`, `POST /clients`
+- **コントローラー**: `App\Http\Controllers\ClientController@create`, `store`
+- **ビュー**: `resources/views/clients/create.blade.php`
+- **バリデーション**:
+  - `name`: required, string, max:255
+  - `company`: nullable, string, max:255
+  - `memo`: nullable, string
+  - `questionnaire_text`: nullable, string
+  - `answers_text`: nullable, string（登録時は任意、提案生成時は必須）
+- **機能**: クライアント情報を登録
+
+#### 3.3.3 クライアント詳細
+- **ルート**: `GET /clients/{id}`
+- **コントローラー**: `App\Http\Controllers\ClientController@show`
+- **ビュー**: `resources/views/clients/show.blade.php`
+- **機能**:
+  - クライアント基本情報表示
+  - **「ヒアリング回答」セクション**:
+    - 送付した質問（参照用、折りたたみ可能）
+    - 回答テキスト（表示のみ、編集は編集画面から）
+  - 関連する提案履歴を一覧表示（生成日時の降順）
+  - 各提案の詳細ボタン
+  - 編集・削除ボタン
+
+#### 3.3.4 クライアント編集
+- **ルート**: `GET /clients/{id}/edit`, `PUT /clients/{id}`
+- **コントローラー**: `App\Http\Controllers\ClientController@edit`, `update`
+- **ビュー**: `resources/views/clients/edit.blade.php`
+- **バリデーション**:
+  - `name`: required, string, max:255
+  - `company`: nullable, string, max:255
+  - `memo`: nullable, string
+  - `questionnaire_text`: nullable, string
+  - `answers_text`: required, string（提案生成に必須）
+- **機能**: 
+  - クライアント情報を編集
+  - **フィールド**:
+    - 名前（input type="text"、必須）
+    - 会社名（input type="text"、任意）
+    - **クライアント情報・特徴（memo）**（textarea、任意）
+      - ラベル: 「クライアント情報・特徴」
+      - プレースホルダー: "年齢層、性格、好み、ビジネススタイル、背景などを自由に記入してください"
+      - 説明文: "クライアントの人物像を入力すると、より的確な提案が生成されます。"
+      - 入力例: "40代男性、IT企業経営者。論理的思考を重視し、データに基づいた判断を好む。ビジネス書や経営関連の情報を積極的に収集。シンプルで洗練されたデザインを好む。時間を大切にし、効率的なソリューションを求める傾向。"
+    - 送付した質問テキスト（textarea、参照用・任意、rows="10"）
+    - ヒアリング回答（textarea、必須、rows="20"、min-height: 400px）
+      - プレースホルダーで使い方を説明
+      - メール/LINE/チャットで返ってきた回答をコピペ
+
+#### 3.3.5 クライアント削除
+- **ルート**: `DELETE /clients/{id}`
+- **コントローラー**: `App\Http\Controllers\ClientController@destroy`
+- **機能**:
+  - JavaScriptで確認ダイアログ表示（関連提案も削除される旨を警告）
+  - CASCADE削除により関連提案も自動削除
+  - 削除後は一覧画面へリダイレクト
+
+### 3.4 提案生成機能
+
+#### 3.4.1 提案生成処理フロー
+
+```
+1. クライアント詳細画面で「提案生成」ボタンクリック
+   ↓
+2. React: 確認ダイアログ表示（Modalコンポーネント）
+   ↓
+3. Inertia.js router.post()でリクエスト送信（POST /clients/{id}/proposals/generate）
+   ↓
+4. サーバー側処理:
+   a. ヒアリング回答（answers_text）のチェック
+      - 未入力の場合はエラー返却（Inertia.jsのflash message）
+   b. データベースから全記事を取得（Article::all()）
+      - 記事がない場合はエラー返却
+   c. 記事のcontentを結合
+   d. プロンプト生成（記事データ + クライアント情報 + ヒアリング回答）
+   e. Gemini APIにリクエスト送信（GeminiApiService）
+   f. レスポンスをパース（JSON形式）
+   g. Proposalモデルに保存
+   h. Inertia.jsで提案詳細画面へリダイレクト
+   ↓
+5. フロントエンド:
+   - 成功時: 自動的に提案詳細画面へリダイレクト
+   - エラー時: Inertia.jsのflash messageでエラーメッセージ表示
+   - ローディング表示: LoadingSpinnerコンポーネント
+```
+
+#### 3.4.2 提案生成API
+- **ルート**: `POST /clients/{client_id}/proposals/generate`
+- **コントローラー**: `App\Http\Controllers\ProposalController@generate`
+- **処理内容**:
+  1. クライアント存在確認
+  2. **ヒアリング回答（answers_text）チェック**
+     - 未入力の場合はエラー返却: "ヒアリング回答が未入力です。先にクライアント情報を編集してヒアリング回答を入力してください。"
+  3. 記事データ取得（Article::all()）
+  4. 記事が存在しない場合はエラー返却
+  5. **プロンプト生成（記事データ + クライアント情報 + ヒアリング回答）**
+  6. Gemini API呼び出し（リトライロジック含む）
+  7. JSONレスポンスをパース
+  8. Proposalモデルに保存
+  9. JSONレスポンス返却
+
+#### 3.4.3 Gemini APIプロンプト設計
+
+```
+以下の記事データとクライアントのヒアリング回答を分析して、「{クライアント名}」様向けのプロフィールと商品設計を提案してください。
+
+【記事データ】
+
+{全記事の本文を結合（記事間は改行で区切る）}
+
+【クライアント情報】
+
+名前: {クライアント名}
+会社: {会社名}
+クライアント特徴: {memo}
+
+【ヒアリング回答】
+
+{answers_text}
+
+【指示】
+
+- 記事データから学んだマーケティングノウハウを活用してください
+- クライアント特徴を踏まえて、パーソナライズされた提案をしてください
+- ヒアリング回答を最大限活用してください
+- 回答が不完全な場合は、記事データや一般的なビジネス知識から推測して補完してください
+- クライアントの強みやターゲットを明確にしてください
+- クライアントの人柄に合った表現やトーンを使用してください
+
+【出力形式】
+
+以下のJSON形式で必ず出力してください。JSON以外のテキストは含めないでください：
+
+{
+  "x_profile": "X用プロフィール（160文字以内で簡潔に）",
+  "instagram_profile": "Instagram用プロフィール（150文字以内で簡潔に）",
+  "coconala_profile": "ココナラ用プロフィール（詳しく、サービス内容や特徴を含む）",
+  "product_design": "商品設計案（価格、内容、ターゲット、提供方法等を含む詳細な提案）"
+}
+
+【注意事項】
+- x_profileは160文字以内で簡潔に
+- instagram_profileは150文字以内で簡潔に
+- coconala_profileとproduct_designは詳細に記述
+- JSON形式のみを返却し、説明文は不要
+```
+
+#### 3.4.4 エラーハンドリング
+- **ヒアリング回答未入力**:
+  - エラーメッセージ: "ヒアリング回答が未入力です。先にクライアント情報を編集してヒアリング回答を入力してください。"
+  - クライアント編集画面へのリンクを含める
+- **API呼び出し失敗**:
+  - 最大3回までリトライ（指数バックオフ: 1秒、2秒、4秒）
+  - タイムアウト: 60秒
+  - エラーメッセージ: "提案の生成に失敗しました。しばらく時間をおいて再度お試しください。"
+- **記事なし**:
+  - エラーメッセージ: "記事が登録されていません。先に記事を登録してください。"
+- **JSONパースエラー**:
+  - エラーメッセージ: "提案データの処理に失敗しました。"
+- **クライアント不存在**:
+  - 404エラー
+
+### 3.5 質問マスター管理機能
+
+#### 3.5.1 質問一覧
+- **ルート**: `GET /questions`
+- **コントローラー**: `App\Http\Controllers\QuestionController@index`
+- **ビュー**: `resources/views/questions/index.blade.php`
+- **機能**:
+  - 全質問を表示（sort_order昇順）
+  - テーブル形式: 表示順、質問文、操作（編集・削除）
+  - **「質問を生成」ボタン** - 初回のみ（質問が0件の場合に表示）
+  - **「質問を再生成」ボタン** - 既存の質問をすべて削除して再生成
+  - **「質問テキストをコピー」ボタン** - クリップボードにコピー（Q&A形式）
+  - 「新規追加」ボタン - 手動で質問を追加
+
+#### 3.5.2 質問生成機能（Gemini API）
+- **ルート**: `POST /questions/generate`
+- **コントローラー**: `App\Http\Controllers\QuestionController@generate`
+- **処理内容**:
+  1. 全記事を取得（Article::all()）
+  2. 記事がない場合はエラー返却
+  3. Gemini APIにプロンプト送信（後述）
+  4. JSONレスポンスをパース
+  5. questionsテーブルに保存（一括INSERT、sort_orderは1から順番に）
+  6. 成功メッセージと共に一覧画面へリダイレクト
+
+**Gemini APIプロンプト（質問生成用）**:
+```
+以下の記事データを分析して、クライアントに対するヒアリング質問リストを作成してください。
+
+【記事データ】
+
+{全記事の本文を結合}
+
+【要件】
+
+- ビジネス向けプロフィールと商品設計を作成するための質問
+- 10〜15個程度の質問を生成
+- 具体的で答えやすい質問にする
+- **以下の基本質問を必ず含めてください**:
+  1. ターゲット顧客（年齢、性別、職業、悩み）
+  2. 提供するサービス/商品の内容
+  3. 競合との差別化ポイント・強み
+  4. 価格帯
+  5. 提供方法（オンライン/オフライン等）
+  6. 顧客に提供したい未来
+- 上記以外にも、記事データに基づいた追加の質問を生成してください
+
+【出力形式】
+
+以下のJSON形式で必ず出力してください：
+
+{
+  "questions": [
+    "あなたのターゲット顧客はどのような人ですか？（年齢、職業、悩みなど）",
+    "現在提供している（または提供したい）サービスや商品は何ですか？",
+    "競合他社と比べた時のあなたの強みは何ですか？",
+    "価格帯やサービス提供方法について教えてください。",
+    "お客様にどのような未来を提供したいですか？",
+    ...
+  ]
+}
+
+【注意事項】
+
+- JSON形式のみを返却し、説明文は不要
+- questionsは配列形式
+```
+
+#### 3.5.3 質問再生成機能
+- **ルート**: `POST /questions/regenerate`
+- **コントローラー**: `App\Http\Controllers\QuestionController@regenerate`
+- **処理内容**:
+  1. JavaScriptで確認ダイアログ表示: "既存の質問をすべて削除して再生成しますか？"
+  2. OKの場合、全質問を削除（`Question::truncate()`）
+  3. 質問生成処理を実行（generateメソッドと同じ）
+  4. 成功メッセージと共に一覧画面へリダイレクト
+
+**注意**: 質問を削除しても、クライアントの回答（answers_text）は保持されます。
+
+#### 3.5.4 質問テキストコピー機能
+- **実装**: JavaScriptでクリップボードにコピー
+- **出力形式**:
+```
+【ヒアリング質問】
+
+Q1. あなたのターゲット顧客はどのような人ですか？（年齢、職業、悩みなど）
+A1. 
+
+Q2. 現在提供している（または提供したい）サービスや商品は何ですか？
+A2. 
+
+Q3. 競合他社と比べた時のあなたの強みは何ですか？
+A3. 
+
+...（全質問を同様の形式で）
+
+---
+
+上記の質問にご回答いただき、返信をお願いいたします。
+```
+
+#### 3.5.5 質問の手動管理
+- **登録**: `GET/POST /questions/create`
+  - バリデーション: `question` (required, string), `sort_order` (nullable, integer)
+- **編集**: `GET/PUT /questions/{id}/edit`
+  - バリデーション: 登録時と同等
+- **削除**: `DELETE /questions/{id}`
+  - 確認ダイアログ表示
+  - 物理削除
+- **並び替え**: sort_orderを手動で編集可能
+
+### 3.6 提案履歴管理機能
+
+#### 3.6.1 提案詳細表示
+- **ルート**: `GET /proposals/{id}`
+- **コントローラー**: `App\Http\Controllers\ProposalController@show`
+- **ビュー**: `resources/views/proposals/show.blade.php`
+- **機能**:
+  - 提案内容をすべて表示（X、Instagram、ココナラ、商品設計）
+  - 生成日時、更新日時表示
+  - 編集・削除ボタン
+  - 所属クライアントへのリンク
+
+#### 3.6.2 提案編集
+- **ルート**: `GET /proposals/{id}/edit`, `PUT /proposals/{id}`
+- **コントローラー**: `App\Http\Controllers\ProposalController@edit`, `update`
+- **ビュー**: `resources/views/proposals/edit.blade.php`
+- **バリデーション**:
+  - `x_profile`: required, string
+  - `instagram_profile`: required, string
+  - `coconala_profile`: required, string
+  - `product_design`: required, string
+- **機能**: 生成後の提案内容を手動で修正可能
+
+#### 3.6.3 提案削除
+- **ルート**: `DELETE /proposals/{id}`
+- **コントローラー**: `App\Http\Controllers\ProposalController@destroy`
+- **機能**:
+  - JavaScriptで確認ダイアログ表示
+  - 物理削除
+  - 削除後はクライアント詳細画面へリダイレクト
+
+---
+
+## 4. API設計
+
+### 4.1 Gemini API統合
+
+#### 4.1.1 使用パッケージ
+```bash
+composer require google/generative-ai-php
+```
+
+#### 4.1.2 サービスクラス設計
+- **クラス**: `App\Services\GeminiApiService`
+- **メソッド**:
+  - `generateProposal(string $prompt): array`
+    - Gemini APIを呼び出し
+    - JSONレスポンスをパース
+    - 配列形式で返却
+    - 例外処理とリトライロジックを含む
+
+#### 4.1.3 環境変数設定
+```env
+GEMINI_API_KEY=your_api_key_here
+GEMINI_MODEL=gemini-1.5-pro
+GEMINI_TIMEOUT=60
+GEMINI_MAX_RETRIES=3
+```
+
+#### 4.1.4 実装コード例（サービスクラス）
+
+```php
+<?php
+
+namespace App\Services;
+
+use Google\GenerativeAI\Client;
+use Google\GenerativeAI\GenerativeModel;
+use Illuminate\Support\Facades\Log;
+use Exception;
+
+class GeminiApiService
+{
+    private string $apiKey;
+    private string $model;
+    private int $timeout;
+    private int $maxRetries;
+
+    public function __construct()
+    {
+        $this->apiKey = config('services.gemini.api_key');
+        $this->model = config('services.gemini.model', 'gemini-1.5-pro');
+        $this->timeout = config('services.gemini.timeout', 60);
+        $this->maxRetries = config('services.gemini.max_retries', 3);
+    }
+
+    /**
+     * Gemini APIを呼び出して提案を生成
+     */
+    public function generateProposal(string $prompt): array
+    {
+        $client = new Client($this->apiKey);
+        $model = $client->generativeModel($this->model);
+        
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt < $this->maxRetries) {
+            try {
+                $response = $model->generateContent($prompt, [
+                    'timeout' => $this->timeout,
+                ]);
+
+                $text = $response->text();
+                
+                // JSONをパース
+                $decoded = json_decode($text, true);
+                
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('JSONのパースに失敗しました: ' . json_last_error_msg());
+                }
+
+                // 必須フィールドの検証
+                $requiredFields = ['x_profile', 'instagram_profile', 'coconala_profile', 'product_design'];
+                foreach ($requiredFields as $field) {
+                    if (!isset($decoded[$field])) {
+                        throw new Exception("必須フィールドが不足しています: {$field}");
+                    }
+                }
+
+                return $decoded;
+            } catch (Exception $e) {
+                $lastException = $e;
+                $attempt++;
+                
+                if ($attempt < $this->maxRetries) {
+                    $waitTime = pow(2, $attempt - 1); // 指数バックオフ
+                    Log::warning("Gemini API呼び出し失敗（試行 {$attempt}/{$this->maxRetries}）: {$e->getMessage()}");
+                    sleep($waitTime);
+                }
+            }
+        }
+
+        throw new Exception("提案の生成に失敗しました: {$lastException->getMessage()}");
+    }
+}
+```
+
+#### 4.1.5 設定ファイル（config/services.php）
+
+```php
+'gemini' => [
+    'api_key' => env('GEMINI_API_KEY'),
+    'model' => env('GEMINI_MODEL', 'gemini-1.5-pro'),
+    'timeout' => env('GEMINI_TIMEOUT', 60),
+    'max_retries' => env('GEMINI_MAX_RETRIES', 3),
+],
+```
+
+### 4.2 レート制限対策
+
+#### 4.2.1 Gemini API制限
+- **無料枠**: 15 RPM（リクエスト/分）
+- **タイムアウト**: 60秒
+- **対策**:
+  - リトライ時の指数バックオフ
+  - エラーメッセージでユーザーに通知
+  - ログ記録
+
+---
+
+## 5. 画面設計
+
+### 5.1 共通レイアウト
+
+#### 5.1.1 レイアウトファイル
+- **ファイル**: `resources/js/Layouts/AppLayout.tsx`
+- **構成**:
+  - Tailwind CSSを使用したレスポンシブレイアウト
+  - ナビゲーションバー（ログイン状態、ログアウトリンク）
+  - サイドバーまたはトップメニュー（各管理画面へのリンク）
+  - メインコンテンツエリア
+  - フッター
+  - Inertia.jsの`<Head>`コンポーネントでページタイトル管理
+
+#### 5.1.2 ナビゲーション構成
+```
+ダッシュボード | 記事管理 | クライアント管理 | 質問マスター管理 | ログアウト
+```
+
+### 5.2 各画面詳細
+
+**注意**: すべての画面はReact + Inertia.js + Tailwind CSSで実装します。
+
+#### 5.2.1 ログイン画面
+- **URL**: `/login`
+- **コンポーネント**: `resources/js/Pages/Auth/Login.tsx`
+- **レイアウト**: シンプルな中央配置（Tailwind CSS）
+- **要素**:
+  - メールアドレス入力（type="email"）
+  - パスワード入力（type="password"）
+  - 「ログイン状態を保持する」チェックボックス
+  - ログインボタン（Buttonコンポーネント）
+  - バリデーションエラー表示（Inertia.jsのerrorsプロパティ）
+
+#### 5.2.2 ダッシュボード
+- **URL**: `/dashboard`
+- **コンポーネント**: `resources/js/Pages/Dashboard.tsx`
+- **要素**:
+  - 統計カード（3列、Tailwind CSSグリッド）:
+    - 記事数
+    - クライアント数
+    - 提案生成数
+  - クイックアクション（Buttonコンポーネント）:
+    - 新規記事登録（router.visit使用）
+    - 新規クライアント登録（router.visit使用）
+  - 最近の提案（最新5件、テーブルまたはカード形式）
+
+#### 5.2.3 記事一覧画面
+- **URL**: `/articles`
+- **コンポーネント**: `resources/js/Pages/Articles/Index.tsx`
+- **要素**:
+  - ページタイトル「記事管理」
+  - 「新規登録」ボタン（router.visit('/articles/create')）
+  - テーブル（Tailwind CSS table classes）:
+    - ヘッダー: タイトル、作成日時、操作
+    - 各行: タイトル（router.visitでリンク）、作成日時、編集ボタン、削除ボタン
+  - ページネーション（Inertia.jsの`<Link>`コンポーネント使用）
+
+#### 5.2.4 記事登録/編集画面
+- **URL**: `/articles/create`, `/articles/{id}/edit`
+- **コンポーネント**: `resources/js/Pages/Articles/Create.tsx`, `Edit.tsx`
+- **要素**:
+  - フォーム（Inertia.jsの`useForm`を使用）:
+    - タイトル（input type="text"、Tailwind CSSクラス）
+    - **「HTMLから本文を自動抽出する」チェックボックス**
+      - 初回取り込み時: チェックON（HTMLソース全体を貼り付け）
+      - 通常登録・編集時: チェックOFF（デフォルト、テキスト直接入力）
+      - 説明文付き（使用方法の説明）
+    - 本文（textarea、Tailwind CSSでmin-height: 500px、width: 100%）
+      - HTMLタグを含むテキストも入力可能
+      - フォント: font-mono（コード表示に適したフォント）
+      - プレースホルダーまたは説明文で使用方法を案内
+  - 「保存」ボタン（Buttonコンポーネント使用）
+  - 「続けて登録」ボタン（登録画面のみ、保存後にフォームをクリアして再表示）
+  - 「キャンセル」ボタン（一覧へ戻る、router.visit使用）
+  - バリデーションエラー表示（errorsプロパティから取得）
+
+#### 5.2.5 クライアント一覧画面
+- **URL**: `/clients`
+- **要素**:
+  - ページタイトル「クライアント管理」
+  - 「新規登録」ボタン
+  - テーブル:
+    - ヘッダー: 名前、会社名、作成日時、操作
+    - 各行: 名前、会社名、作成日時、詳細・編集・削除・提案生成ボタン
+  - ページネーション
+
+#### 5.2.6 クライアント登録画面
+- **URL**: `/clients/create`
+- **コンポーネント**: `resources/js/Pages/Clients/Create.tsx`
+- **要素**:
+  - フォーム（Inertia.jsの`useForm`を使用）:
+    - 名前（input type="text"、必須）
+    - 会社名（input type="text"、任意）
+    - クライアント情報・特徴（memo）（textarea、任意）
+      - プレースホルダー: "年齢層、性格、好み、ビジネススタイル、背景などを自由に記入してください"
+  - 「保存」ボタン（Buttonコンポーネント）
+  - 「キャンセル」ボタン
+  - バリデーションエラー表示（errorsプロパティから取得）
+
+#### 5.2.7 クライアント詳細画面
+- **URL**: `/clients/{id}`
+- **要素**:
+  - クライアント基本情報セクション:
+    - 名前、会社名、メモ
+    - 編集・削除ボタン
+  - 「提案生成」ボタン（目立つ位置）
+  - 提案履歴セクション:
+    - テーブル: 生成日時、操作（詳細・削除）
+    - ページネーション
+
+#### 5.2.8 提案生成画面
+- **処理**: Ajax非同期処理
+- **UI**:
+  - 生成開始時にローディング表示（モーダルまたはスピナー）
+  - 成功時: 自動的に提案詳細画面へリダイレクト
+  - エラー時: エラーメッセージをアラート表示
+
+#### 5.2.9 提案詳細画面
+- **URL**: `/proposals/{id}`
+- **要素**:
+  - クライアント情報（リンク）
+  - 提案内容セクション:
+    - X用プロフィール（textarea形式で表示、編集可能な形式）
+    - Instagram用プロフィール
+    - ココナラ用プロフィール
+    - 商品設計案（詳細表示）
+  - 生成日時・更新日時
+  - 編集・削除ボタン
+
+#### 5.2.10 提案編集画面
+- **URL**: `/proposals/{id}/edit`
+- **要素**:
+  - フォーム:
+    - X用プロフィール（textarea）
+    - Instagram用プロフィール（textarea）
+    - ココナラ用プロフィール（textarea）
+    - 商品設計案（textarea、rows=15）
+  - 「保存」ボタン
+  - 「キャンセル」ボタン
+  - バリデーションエラー表示
+
+#### 5.2.11 質問マスター一覧画面
+- **URL**: `/questions`
+- **要素**:
+  - ページタイトル「質問マスター管理」
+  - **「質問を生成」ボタン** - 初回のみ（質問が0件の場合に表示）
+  - **「質問を再生成」ボタン** - 既存の質問をすべて削除して再生成（確認ダイアログ必須）
+  - **「質問テキストをコピー」ボタン** - クリップボードにコピー（目立つ位置に配置）
+  - 「新規追加」ボタン - 手動で質問を追加
+  - テーブル:
+    - ヘッダー: 表示順、質問文、操作
+    - 各行: sort_order、質問文（折り返し表示）、編集ボタン、削除ボタン
+  - 並び順はsort_order昇順
+
+#### 5.2.12 質問登録/編集画面
+- **URL**: `/questions/create`, `/questions/{id}/edit`
+- **要素**:
+  - フォーム:
+    - 質問文（textarea、rows=5）
+    - 表示順（input type="number"、デフォルト: 0）
+  - 「保存」ボタン
+  - 「キャンセル」ボタン
+  - バリデーションエラー表示
+
+#### 5.2.13 クライアント詳細画面（拡張）
+- **URL**: `/clients/{id}`
+- **追加要素**:
+  - **「ヒアリング回答」セクション**:
+    - 送付した質問（参照用、アコーディオン等で折りたたみ可能）
+    - 回答テキスト（表示のみ、編集は編集画面から）
+
+#### 5.2.14 クライアント編集画面（拡張）
+- **URL**: `/clients/{id}/edit`
+- **コンポーネント**: `resources/js/Pages/Clients/Edit.tsx`
+- **要素**:
+  - 名前（input type="text"、必須）
+  - 会社名（input type="text"、任意）
+  - **クライアント情報・特徴（memo）**（textarea、任意）
+    - ラベル: 「クライアント情報・特徴」
+    - プレースホルダー: "年齢層、性格、好み、ビジネススタイル、背景などを自由に記入してください"
+    - 説明文: "クライアントの人物像を入力すると、より的確な提案が生成されます。"
+    - 入力例: "40代男性、IT企業経営者。論理的思考を重視し、データに基づいた判断を好む。ビジネス書や経営関連の情報を積極的に収集。シンプルで洗練されたデザインを好む。時間を大切にし、効率的なソリューションを求める傾向。"
+  - **送付した質問テキスト**（textarea、参照用・任意、Tailwind CSS font-mono）
+    - プレースホルダー: "クライアントに送った質問をここに記録できます"
+    - 説明文: "質問マスター画面から「質問テキストをコピー」してここに貼り付けておくと便利です。"
+  - **ヒアリング回答**（textarea、必須、Tailwind CSS min-h-96）
+    - プレースホルダー: "クライアントから返ってきた回答をここに貼り付けてください。全ての質問に回答がなくても問題ありません。"
+    - 説明文: "メール、LINE、チャット等で返ってきた回答をそのままコピー＆ペーストしてください。回答が不完全でも、AIが記事データから補完します。"
+  - Inertia.jsの`useForm`でフォーム管理、エラーは`errors`プロパティから表示
+
+### 5.3 画面遷移図
+
+```
+ダッシュボード
+  ├→ 記事管理
+  │    ├→ 記事一覧
+  │    ├→ 記事登録/編集/削除
+  │    └→ 続けて登録
+  │
+  ├→ クライアント管理
+  │    ├→ クライアント一覧
+  │    ├→ クライアント登録/編集/削除
+  │    ├→ クライアント詳細
+  │    │    ├→ ヒアリング回答（表示）
+  │    │    └→ 提案生成
+  │    │         └→ 提案詳細
+  │    │              └→ 提案編集/削除
+  │    └→ クライアント編集
+  │         └→ ヒアリング回答入力
+  │
+  ├→ 質問マスター管理 ★新規
+  │    ├→ 質問一覧
+  │    ├→ 質問を生成（Gemini API）
+  │    ├→ 質問を再生成（確認ダイアログ）
+  │    ├→ 質問テキストをコピー（JavaScript）
+  │    └→ 質問登録/編集/削除
+  │
+  └→ ログアウト
+```
+
+### 5.4 UI/UX設計原則
+
+- **シンプル**: 余計な装飾を避け、機能を重視
+- **明確**: ボタンのラベルと配置を明確に
+- **一貫性**: 画面間で統一されたデザイン（Tailwind CSSのコンポーネントを再利用）
+- **フィードバック**: アクション後は適切なメッセージ表示（Inertia.jsのflash message）
+- **ローディング**: API呼び出し時はローディング表示（LoadingSpinnerコンポーネント）
+- **型安全性**: TypeScriptで型定義を活用し、コンパイル時エラーを防止
+
+---
+
+## 6. セキュリティ設計
+
+### 6.1 認証・認可
+
+- **認証**: Laravel Breeze（標準認証システム）
+- **認可**: 全機能は認証必須（ミドルウェア: `auth`）
+- **パスワード**: bcryptハッシュ化（Laravel標準）
+- **セッション管理**: Laravel標準セッション（ファイルまたはDB）
+
+### 6.2 CSRF保護
+
+- **対策**: Laravel標準のCSRFトークン（Inertia.jsが自動対応）
+- **適用**: すべてのPOST/PUT/DELETEリクエスト
+- **Inertia.js**: 自動的にCSRFトークンを送信
+
+### 6.3 XSS対策
+
+- **対策**: Reactの自動エスケープ（デフォルトで有効）
+- **生HTML表示**: `dangerouslySetInnerHTML`を使用（本プロジェクトでは使用しない、信頼できるデータのみ）
+
+### 6.4 SQLインジェクション対策
+
+- **対策**: Eloquent ORM使用（パラメータバインディング）
+- **生クエリ**: 使用しない（必要時はプレースホルダー使用）
+
+### 6.5 入力バリデーション
+
+- **実装**: Laravel Validation
+- **適用箇所**:
+  - フォームリクエスト（FormRequest）
+  - コントローラー内バリデーション
+- **ルール**: 各機能要件に基づく
+
+### 6.6 機密情報管理
+
+- **APIキー**: 環境変数（`.env`）で管理
+- **.envファイル**: Git管理外（`.gitignore`）
+- **.env.example**: テンプレートファイルを提供
+
+### 6.7 ファイルアップロード
+
+- **本プロジェクト**: ファイルアップロード機能なし（将来拡張時は検討）
+
+---
+
+## 7. パフォーマンス設計
+
+### 7.1 データベース最適化
+
+- **インデックス**: 検索・ソートで使用するカラムにインデックス設定
+  - `articles.created_at`
+  - `clients.created_at`
+  - `proposals.client_id`, `proposals.created_at`
+- **N+1問題対策**: Eager Loading（`with()`）を使用
+  - クライアント詳細: `$client->load('proposals')`
+  - 提案一覧: `Proposal::with('client')->get()`
+
+### 7.2 クエリ最適化
+
+- **ページネーション**: 大量データはページネーション（20件/ページ）
+- **必要なカラムのみ取得**: `select()`で必要なカラムのみ指定
+
+### 7.3 API呼び出し最適化
+
+- **タイムアウト設定**: 60秒
+- **リトライロジック**: 指数バックオフでサーバー負荷軽減
+- **非同期処理**: Ajaxでユーザー体験向上（将来はキュー処理も検討）
+
+### 7.4 フロントエンド最適化
+
+- **アセット**: CDN使用（Bootstrap）
+- **JavaScript**: 最小限の使用
+- **キャッシュ**: ブラウザキャッシュを活用
+
+### 7.5 大量データ対応
+
+- **記事本文**: LONGTEXT型で10万文字対応
+- **提案生成**: 全記事を結合して送信（将来的に記事選択機能を検討）
+- **HTMLパース処理**: パフォーマンスを考慮し、必要最小限の処理のみ実行
+
+---
+
+## 7.6 HTMLパース機能の技術詳細
+
+### 7.6.1 使用ライブラリ
+
+- **パッケージ**: `symfony/dom-crawler`
+- **追加パッケージ**: `symfony/css-selector`（CSSセレクター対応）
+
+```bash
+composer require symfony/dom-crawler symfony/css-selector
+```
+
+### 7.6.2 HTML抽出アルゴリズム
+
+#### 抽出対象の優先順位
+1. `<article>`タグ内のコンテンツ
+2. `.post_content`クラスの要素
+3. `#main_content`IDの要素
+4. `<main>`タグ
+5. `.entry-content`クラス（WordPressなどで使用）
+6. `<body>`タグ（最終手段）
+
+#### 除外すべき要素
+- `<script>`タグ（JavaScriptコード）
+- `<style>`タグ（CSS）
+- `<nav>`タグ（ナビゲーション）
+- `<header>`タグ
+- `<footer>`タグ
+- `<aside>`タグ（サイドバー）
+
+#### 処理フロー
+1. HTML文字列をCrawlerオブジェクトに変換
+2. 優先順位に従って要素を検索
+3. 見つかった要素から不要なタグを削除
+4. テキストを抽出（またはHTML構造を保持）
+5. 抽出失敗時は`strip_tags()`でフォールバック
+
+### 7.6.3 実装コード例
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use Symfony\Component\DomCrawler\Crawler;
+use Illuminate\Http\Request;
+
+class ArticleController extends Controller
+{
+    /**
+     * HTMLから本文部分を抽出
+     */
+    private function extractContentFromHtml(string $html): string
+    {
+        try {
+            $crawler = new Crawler($html);
+            
+            // 抽出対象の優先順位で試行
+            $selectors = [
+                'article',
+                '.post_content',
+                '#main_content',
+                'main',
+                '.entry-content',
+                'body',
+            ];
+            
+            foreach ($selectors as $selector) {
+                try {
+                    $element = $crawler->filter($selector);
+                    if ($element->count() > 0) {
+                        // HTMLを取得
+                        $htmlContent = $element->html();
+                        $cleanCrawler = new Crawler($htmlContent);
+                        
+                        // 不要な要素を削除
+                        $tagsToRemove = ['script', 'style', 'nav', 'header', 'footer', 'aside'];
+                        foreach ($tagsToRemove as $tag) {
+                            $cleanCrawler->filter($tag)->each(function (Crawler $node) {
+                                $node->getNode(0)?->parentNode?->removeChild($node->getNode(0));
+                            });
+                        }
+                        
+                        // テキストを抽出（HTML構造を保持したい場合はhtml()を使用）
+                        return $cleanCrawler->text();
+                    }
+                } catch (\Exception $e) {
+                    // セレクターが見つからない場合は次を試行
+                    continue;
+                }
+            }
+        } catch (\Exception $e) {
+            // パースに失敗した場合はログに記録
+            \Log::warning("HTML抽出に失敗しました: " . $e->getMessage());
+        }
+        
+        // どれも見つからない場合はstrip_tagsでフォールバック
+        return strip_tags($html);
+    }
+    
+    /**
+     * 記事を保存
+     */
+    public function store(Request $request)
+    {
+        $validated = $request->validate([
+            'title' => 'required|string|max:255',
+            'content' => 'required|string',
+            'auto_extract' => 'nullable|boolean',
+        ]);
+        
+        $content = $validated['content'];
+        
+        // HTMLから本文を自動抽出する場合
+        if ($request->boolean('auto_extract')) {
+            $content = $this->extractContentFromHtml($content);
+        }
+        
+        Article::create([
+            'title' => $validated['title'],
+            'content' => $content,
+        ]);
+        
+        return redirect()->route('articles.index')
+            ->with('success', '記事を登録しました');
+    }
+}
+```
+
+### 7.6.4 データの扱い
+
+#### 保存時
+- HTMLタグが含まれていてもそのまま保存（`htmlspecialchars()`等でエスケープしない）
+- データベースの`LONGTEXT`型に格納
+
+#### 表示時
+- Reactの自動エスケープ（デフォルトで有効）
+- HTMLをそのまま表示したい場合は`dangerouslySetInnerHTML`を使用（本プロジェクトでは使用しない）
+
+#### Gemini API送信時
+- HTMLタグごと送信可能（Gemini APIはHTML構造を理解可能）
+- 全記事の本文を結合して送信
+
+---
+
+## 8. デプロイ設計
+
+### 8.1 デプロイ環境
+
+- **サーバー**: さくらレンタルサーバー スタンダード
+- **PHPバージョン**: 8.1以上（サーバーで確認）
+- **MySQL**: 8.0（サーバーで確認）
+- **公開ディレクトリ**: `public/`（ドキュメントルート）
+
+### 8.2 デプロイ手順
+
+#### 8.2.1 事前準備
+1. サーバーのPHPバージョン確認
+2. Composerインストール確認
+3. Git使用可能確認
+4. `.env`ファイルの準備
+
+#### 8.2.2 デプロイ実行
+```bash
+# 1. サーバーにSSH接続
+ssh user@server.sakura.ne.jp
+
+# 2. プロジェクトディレクトリへ移動
+cd /path/to/project
+
+# 3. Gitから最新コードを取得
+git pull origin main
+
+# 4. 依存関係インストール（本番用）
+composer install --no-dev --optimize-autoloader
+
+# 5. 環境変数設定
+cp .env.example .env
+# .envを編集して必要な値を設定
+
+# 6. アプリケーションキー生成
+php artisan key:generate
+
+# 7. データベースマイグレーション
+php artisan migrate --force
+
+# 8. フロントエンドビルド（本番用）
+npm ci
+npm run build
+
+# 9. 設定キャッシュ（本番環境最適化）
+php artisan config:cache
+php artisan route:cache
+
+# 10. 権限設定（必要に応じて）
+chmod -R 755 storage
+chmod -R 755 bootstrap/cache
+```
+
+#### 8.2.3 さくらレンタルサーバー特有の設定
+
+- **ドキュメントルート**: `public/`ディレクトリを指定
+- **PHP設定**: `.htaccess`でPHPバージョン指定（必要に応じて）
+- **セッション**: ファイルセッション（デフォルト）またはDBセッション
+
+#### 8.2.4 デプロイ後の確認
+
+1. ログイン機能の確認
+2. 各CRUD機能の確認
+3. 提案生成機能の確認（Gemini API接続確認）
+4. エラーログの確認
+
+### 8.3 バックアップ戦略
+
+- **データベース**: 定期的なmysqldump実行
+- **ファイル**: Gitでコード管理
+- **.envファイル**: 安全な場所に別途保管
+
+---
+
+## 9. 開発計画
+
+### 9.1 Phase 1: MVP（最小限の機能）
+
+#### 目標
+基本的なCRUD機能と提案生成機能を実装
+
+#### タスク
+1. **環境構築**
+   - Laravelプロジェクト作成
+   - Laravel Breezeインストール
+   - データベース設定
+
+2. **データベース**
+   - マイグレーションファイル作成（articles, clients, proposals, questions）
+   - clientsテーブルにquestionnaire_text, answers_textカラム追加
+   - モデル作成（User, Article, Client, Proposal, Question）
+
+3. **認証機能**
+   - Laravel Breezeセットアップ
+   - 初回ユーザー作成
+
+4. **記事管理**
+   - 一覧・登録・編集・削除機能
+   - HTMLパース機能（symfony/dom-crawler使用）
+   - 「HTMLから本文を自動抽出する」チェックボックス機能
+   - 「続けて登録」ボタン機能
+   - バリデーション
+
+5. **クライアント管理**
+   - 一覧・登録・編集・削除機能
+   - 詳細画面（提案履歴含む）
+   - ヒアリング回答フィールド追加（questionnaire_text, answers_text）
+   - バリデーション
+
+6. **Gemini API統合**
+   - GeminiApiService作成
+   - 設定ファイル作成
+
+7. **質問マスター管理機能**
+   - 質問一覧画面
+   - 質問生成機能（Gemini API）
+   - 質問テキストコピー機能（JavaScript）
+   - クライアント編集画面にヒアリング回答フィールド追加
+
+8. **提案生成機能（修正）**
+   - ヒアリング回答（answers_text）チェック
+   - プロンプト修正（記事データ + クライアント情報 + ヒアリング回答）
+   - エラーハンドリング
+   - Ajax実装
+
+9. **提案管理**
+   - 詳細表示
+   - 削除機能
+
+### 9.2 Phase 2: 機能拡張
+
+#### タスク
+1. **提案編集機能**
+   - 編集画面作成
+   - 更新処理
+
+2. **質問マスター管理の拡張**
+   - 質問の手動管理（追加・編集・削除）
+   - 質問再生成機能
+
+3. **UI/UX改善**
+   - ローディング表示改善
+   - エラーメッセージ改善
+   - レスポンシブ対応（必要に応じて）
+
+4. **バリデーション強化**
+   - より詳細なバリデーションルール
+   - カスタムバリデーションメッセージ
+
+### 9.3 Phase 3: 最適化・保守
+
+#### タスク
+1. **パフォーマンス最適化**
+   - クエリ最適化
+   - インデックス追加
+
+2. **ログ機能**
+   - 操作ログ記録
+   - エラーログ管理
+
+3. **テスト**
+   - ユニットテスト
+   - 機能テスト
+
+4. **ドキュメント整備**
+   - README.md更新
+   - 運用マニュアル作成
+
+---
+
+## 10. ファイル構成
+
+### 10.1 プロジェクト構造
+
+```
+ProfileGen/
+├── app/
+│   ├── Http/
+│   │   ├── Controllers/
+│   │   │   ├── Auth/
+│   │   │   │   └── AuthenticatedSessionController.php
+│   │   │   ├── ArticleController.php
+│   │   │   ├── ClientController.php
+│   │   │   ├── ProposalController.php
+│   │   │   ├── QuestionController.php
+│   │   │   └── DashboardController.php
+│   │   ├── Requests/
+│   │   │   ├── ArticleRequest.php
+│   │   │   ├── ClientRequest.php
+│   │   │   ├── ProposalRequest.php
+│   │   │   └── QuestionRequest.php
+│   │   └── Middleware/
+│   ├── Models/
+│   │   ├── User.php
+│   │   ├── Article.php
+│   │   ├── Client.php
+│   │   ├── Proposal.php
+│   │   └── Question.php
+│   └── Services/
+│       └── GeminiApiService.php
+├── config/
+│   └── services.php
+├── database/
+│   ├── migrations/
+│   │   ├── create_articles_table.php
+│   │   ├── create_clients_table.php
+│   │   └── create_proposals_table.php
+│   └── seeders/
+│       └── DatabaseSeeder.php
+├── resources/
+│   ├── js/
+│   │   ├── Components/          # 共通コンポーネント
+│   │   │   ├── Button.tsx
+│   │   │   ├── Modal.tsx
+│   │   │   └── LoadingSpinner.tsx
+│   │   ├── Layouts/              # レイアウトコンポーネント
+│   │   │   └── AppLayout.tsx
+│   │   ├── Pages/                # ページコンポーネント（Inertia.js）
+│   │   │   ├── Articles/
+│   │   │   │   ├── Index.tsx
+│   │   │   │   ├── Create.tsx
+│   │   │   │   └── Edit.tsx
+│   │   │   ├── Clients/
+│   │   │   │   ├── Index.tsx
+│   │   │   │   ├── Create.tsx
+│   │   │   │   ├── Edit.tsx
+│   │   │   │   └── Show.tsx
+│   │   │   ├── Proposals/
+│   │   │   │   ├── Show.tsx
+│   │   │   │   └── Edit.tsx
+│   │   │   ├── Questions/
+│   │   │   │   ├── Index.tsx
+│   │   │   │   ├── Create.tsx
+│   │   │   │   └── Edit.tsx
+│   │   │   ├── Auth/
+│   │   │   │   └── Login.tsx
+│   │   │   └── Dashboard.tsx
+│   │   ├── Hooks/                # カスタムフック
+│   │   │   └── useProposalGeneration.ts
+│   │   ├── Types/                # 型定義
+│   │   │   └── index.ts
+│   │   └── app.tsx
+│   └── views/
+│       └── app.blade.php         # Inertia.js用のエントリーポイント
+├── vite.config.js
+├── routes/
+│   └── web.php
+├── .env.example
+├── composer.json
+├── README.md
+└── DESIGN.md（本ファイル）
+```
+
+---
+
+## 11. 補足事項
+
+### 11.1 命名規則
+
+- **コントローラー**: 単数形 + Controller（例: `ArticleController`）
+- **モデル**: 単数形（例: `Article`）
+- **Reactコンポーネント**: PascalCase（例: `ArticleIndex.tsx`）
+- **ページコンポーネント**: `resources/js/Pages/{機能名}/{アクション名}.tsx`
+- **ルート**: RESTful（例: `/articles`, `/articles/create`）
+
+### 11.2 コーディング規約
+
+- **PSR-12**: PHPコーディング規約に準拠
+- **Laravel規約**: Laravel公式のベストプラクティスに準拠
+
+### 11.3 エラーハンドリング
+
+- **例外処理**: try-catchブロックで適切に処理
+- **ログ記録**: `Log`ファサードを使用
+- **ユーザー向けメッセージ**: 分かりやすい日本語メッセージ
+
+### 11.4 記事取り込み方法について
+
+#### 11.4.1 取り込み方法の概要
+
+記事の登録方法は以下の2パターンに対応：
+
+1. **初回一括取り込み用**: HTMLソース全体をコピペ → システムが本文を自動抽出
+2. **通常登録・編集用**: 本文テキストを直接コピペ
+
+#### 11.4.2 初回取り込み時の操作フロー
+
+1. 会員サイトにログイン
+2. 各ページをブラウザで開く
+3. ブラウザの「ページのソースを表示」機能でHTMLソース全体をコピー
+4. システムの記事登録画面へ
+5. 「HTMLから本文を自動抽出する」にチェック
+6. タイトル欄に記事タイトルを入力
+7. 本文欄にHTMLソース全体を貼り付け
+8. 「登録」ボタンをクリック
+9. システムが自動的に本文部分のみを抽出してDB保存
+10. 次のページへ（約20回繰り返し）
+
+#### 11.4.3 通常登録時の操作フロー
+
+1. 「HTMLから本文を自動抽出する」のチェックをOFF（デフォルト）
+2. タイトル欄に記事タイトルを入力
+3. 本文欄に表示されているテキストをコピペ
+4. 「登録」ボタンをクリック
+5. 入力内容がそのまま保存される
+
+#### 11.4.4 続けて登録機能
+
+- 記事登録成功後、「続けて登録」ボタンを表示
+- クリックするとフォームがクリアされ、再度登録画面を表示
+- 20件連続登録がスムーズに実行可能
+
+#### 11.4.5 HTMLタグの扱い
+
+- **保存時**: HTMLタグが含まれていてもそのまま保存（エスケープしない）
+- **表示時**: Bladeテンプレートで自動エスケープ（`{{ }}`）
+- **Gemini API送信時**: HTMLタグごと送信してOK（AIが理解可能）
+
+#### 11.4.6 注意事項
+
+- **URLスクレイピング機能は実装しない**
+  - 取り込み元が会員制サイトのため認証が必要
+  - 対象ページ数が約20ページと少量
+  - 追加予定も低い
+
+### 11.5 依存パッケージ
+
+#### Composer依存関係
+- **google/generative-ai-php**: Gemini API統合
+- **symfony/dom-crawler**: HTMLパース機能
+- **symfony/css-selector**: CSSセレクター対応（dom-crawlerの依存）
+
+#### インストールコマンド
+```bash
+composer require google/generative-ai-php
+composer require symfony/dom-crawler symfony/css-selector
+```
+
+### 11.6 質問機能について
+
+#### 11.6.1 機能概要
+
+- **質問マスター**: システム全体で共通の質問リストを管理
+- **ヒアリング回答**: クライアントごとに回答を収集（フリーテキスト形式）
+- **クライアント情報・特徴（memo）**: クライアントの人物像を記録
+- **提案生成**: 記事データ + クライアント情報（名前、会社、memo） + ヒアリング回答 → Gemini APIで提案生成
+
+#### 11.6.2 運用フロー
+
+**初回セットアップ**:
+1. 記事を20件登録（HTMLパース機能使用）
+2. 質問マスター画面で「質問を生成」ボタンをクリック
+3. 質問が自動生成される（10〜15個程度）
+
+**通常運用（クライアントごと）**:
+1. クライアント登録（名前、会社名、クライアント情報・特徴（memo））
+2. 質問マスター画面で「質問テキストをコピー」
+3. メール/LINE/チャットでクライアントに質問を送信
+4. クライアントから回答が返ってくる
+5. クライアント編集画面で：
+   - 「クライアント情報・特徴（memo）」に人物像を記入（任意、推奨）
+   - 「送付した質問テキスト」に質問をコピペ（任意・参照用）
+   - 「ヒアリング回答」にクライアントの回答をコピペ（必須）
+6. 保存
+7. 「提案生成」ボタンをクリック
+8. 提案が生成される（記事データ + クライアント情報 + ヒアリング回答を使用）
+
+**記事追加時（たまに）**:
+1. 新しい記事を追加
+2. 質問マスター画面で「質問を再生成」（任意）
+3. 既存クライアントの回答は保持される
+
+#### 11.6.3 データの扱い
+
+- **質問は全クライアント共通**: 質問マスターで管理
+- **ヒアリング回答はフリーテキスト**: 全質問に回答がなくてもOK
+- **回答が不完全でもOK**: Gemini AIが記事データから補完
+- **質問を変更しても影響なし**: 既存クライアントの回答は保持
+
+#### 11.6.4 提案生成の前提条件
+
+- 記事データが登録されていること
+- クライアントのヒアリング回答（answers_text）が入力されていること（必須）
+- クライアント情報・特徴（memo）は任意だが、入力することでより的確な提案が生成される
+- いずれかが満たされていない場合はエラーメッセージを表示
+
+#### 11.6.5 提案生成時に使用する情報
+
+提案生成時には以下の情報をGemini APIに送信します：
+
+1. **記事データ**: 全記事の本文を結合
+2. **クライアント情報**:
+   - 名前
+   - 会社名
+   - **クライアント特徴（memo）** - 人物像、性格、好みなど（任意）
+3. **ヒアリング回答（answers_text）**: 質問に対する回答（必須）
+
+これらの情報を組み合わせることで、より精度の高い、パーソナライズされた提案を生成します。
+
+### 11.7 将来の拡張可能性
+
+- **記事選択機能**: 提案生成時に記事を選択可能に
+- **テンプレート機能**: プロンプトテンプレートのカスタマイズ
+- **エクスポート機能**: 提案をPDFやCSVでエクスポート
+- **複数ユーザー対応**: マルチテナント対応（現在は単一ユーザー想定）
+- **質問の並び替え機能**: ドラッグ&ドロップで並び替え
+- **ヒアリング回答のプレビュー機能**: フォーマット済みプレビュー
+
+---
+
+---
+
+## 10. コーディング規約
+
+### 10.1 基本原則
+
+本プロジェクトは、標準的なLaravel + React（Inertia.js）のベストプラクティスに従います。
+
+- **コードの一貫性**: チーム全体で統一されたスタイル
+- **可読性**: 他人が理解しやすいコード
+- **保守性**: 将来的な変更に対応しやすい設計
+- **型安全性**: TypeScriptを活用した型定義
+
+### 10.2 バックエンド（Laravel 12）規約
+
+#### 10.2.1 ディレクトリ構造
+
+```
+app/
+├── Http/
+│   ├── Controllers/
+│   │   ├── ArticleController.php
+│   │   ├── ClientController.php
+│   │   ├── ProposalController.php
+│   │   └── QuestionController.php
+│   └── Requests/
+│       ├── ArticleRequest.php
+│       ├── ClientRequest.php
+│       └── ProposalRequest.php
+├── Models/
+│   ├── Article.php
+│   ├── Client.php
+│   ├── Proposal.php
+│   └── Question.php
+└── Services/
+    └── GeminiApiService.php
+```
+
+#### 10.2.2 コントローラー
+
+- **リソースコントローラー**: `php artisan make:controller ArticleController --resource`
+- **薄いコントローラー**: ビジネスロジックはサービスクラスに集約
+- **依存性注入**: コンストラクタインジェクションを使用
+
+```php
+<?php
+
+namespace App\Http\Controllers;
+
+use App\Services\GeminiApiService;
+use App\Models\Client;
+use Illuminate\Http\Request;
+
+class ProposalController extends Controller
+{
+    public function __construct(
+        private GeminiApiService $geminiService
+    ) {}
+    
+    public function generate(Client $client)
+    {
+        // ヒアリング回答のチェック
+        if (empty($client->answers_text)) {
+            return back()->withErrors([
+                'error' => 'ヒアリング回答が未入力です。'
+            ]);
+        }
+        
+        // サービスクラスで処理
+        $result = $this->geminiService->generateProposal(...);
+        
+        return redirect()->route('proposals.show', $result);
+    }
+}
+```
+
+#### 10.2.3 FormRequest
+
+- バリデーションはFormRequestクラスで実装
+- 日本語のエラーメッセージ
+
+```php
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+class ArticleRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'title' => ['required', 'string', 'max:255'],
+            'content' => ['required', 'string'],
+            'auto_extract' => ['nullable', 'boolean'],
+        ];
+    }
+    
+    public function messages(): array
+    {
+        return [
+            'title.required' => 'タイトルは必須です。',
+            'title.max' => 'タイトルは255文字以内で入力してください。',
+            'content.required' => '本文は必須です。',
+        ];
+    }
+}
+```
+
+#### 10.2.4 サービスクラス
+
+- ビジネスロジックはサービスクラスに集約
+- GeminiApiServiceは`App\Services\GeminiApiService`に配置
+- エラーハンドリングとリトライロジックを実装
+
+```php
+<?php
+
+namespace App\Services;
+
+use Google\GenerativeAI\Client;
+use Illuminate\Support\Facades\Log;
+use Exception;
+
+class GeminiApiService
+{
+    private string $apiKey;
+    private string $model;
+    private int $timeout;
+    private int $maxRetries;
+
+    public function __construct()
+    {
+        $this->apiKey = config('services.gemini.api_key');
+        $this->model = config('services.gemini.model', 'gemini-1.5-pro');
+        $this->timeout = config('services.gemini.timeout', 60);
+        $this->maxRetries = config('services.gemini.max_retries', 3);
+    }
+
+    /**
+     * Gemini APIを呼び出して提案を生成
+     * 
+     * @param string $prompt
+     * @return array
+     * @throws Exception
+     */
+    public function generateProposal(string $prompt): array
+    {
+        $client = new Client($this->apiKey);
+        $model = $client->generativeModel($this->model);
+        
+        $attempt = 0;
+        $lastException = null;
+
+        while ($attempt < $this->maxRetries) {
+            try {
+                $response = $model->generateContent($prompt, [
+                    'timeout' => $this->timeout,
+                ]);
+
+                $text = $response->text();
+                $decoded = json_decode($text, true);
+                
+                if (json_last_error() !== JSON_ERROR_NONE) {
+                    throw new Exception('JSONのパースに失敗しました: ' . json_last_error_msg());
+                }
+
+                // 必須フィールドの検証
+                $requiredFields = ['x_profile', 'instagram_profile', 'coconala_profile', 'product_design'];
+                foreach ($requiredFields as $field) {
+                    if (!isset($decoded[$field])) {
+                        throw new Exception("必須フィールドが不足しています: {$field}");
+                    }
+                }
+
+                return $decoded;
+            } catch (Exception $e) {
+                $lastException = $e;
+                $attempt++;
+                
+                if ($attempt < $this->maxRetries) {
+                    $waitTime = pow(2, $attempt - 1); // 指数バックオフ
+                    Log::warning("Gemini API呼び出し失敗（試行 {$attempt}/{$this->maxRetries}）: {$e->getMessage()}");
+                    sleep($waitTime);
+                }
+            }
+        }
+
+        throw new Exception("提案の生成に失敗しました: {$lastException->getMessage()}");
+    }
+    
+    /**
+     * 質問リストを生成
+     * 
+     * @param string $prompt
+     * @return array
+     * @throws Exception
+     */
+    public function generateQuestions(string $prompt): array
+    {
+        // 提案生成と同様の処理
+        // 返り値: ['questions' => [...]]
+    }
+}
+```
+
+#### 10.2.5 エラーハンドリング
+
+- try-catchで適切に処理
+- ユーザー向けメッセージは日本語で分かりやすく
+- ログは`Log`ファサードを使用
+
+### 10.3 フロントエンド（React + Inertia.js + TypeScript）規約
+
+#### 10.3.1 ディレクトリ構造
+
+```
+resources/js/
+├── Components/        # 共通コンポーネント
+│   ├── Button.tsx
+│   ├── Modal.tsx
+│   └── LoadingSpinner.tsx
+├── Layouts/           # レイアウトコンポーネント
+│   └── AppLayout.tsx
+├── Pages/             # ページコンポーネント（Inertia.js）
+│   ├── Articles/
+│   ├── Clients/
+│   ├── Proposals/
+│   └── Questions/
+├── Hooks/             # カスタムフック
+│   └── useProposalGeneration.ts
+├── Types/             # 型定義
+│   └── index.ts
+└── app.tsx
+```
+
+#### 10.3.2 型定義
+
+```typescript
+// resources/js/Types/index.ts
+
+export interface Article {
+  id: number;
+  title: string;
+  content: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Client {
+  id: number;
+  name: string;
+  company: string | null;
+  memo: string | null;
+  questionnaire_text: string | null;
+  answers_text: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Proposal {
+  id: number;
+  client_id: number;
+  x_profile: string;
+  instagram_profile: string;
+  coconala_profile: string;
+  product_design: string;
+  created_at: string;
+  updated_at: string;
+  client?: Client;
+}
+
+export interface Question {
+  id: number;
+  question: string;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+}
+```
+
+#### 10.3.3 Inertia.jsの活用
+
+- `router.get()`, `router.post()`, `router.put()`, `router.delete()` でページ遷移
+- `useForm()` フックでフォーム管理
+- `usePage()` フックでページデータ取得
+- エラーハンドリングは `errors` プロパティを使用
+
+```typescript
+import { useForm } from '@inertiajs/react';
+
+interface ArticleFormData {
+  title: string;
+  content: string;
+  auto_extract: boolean;
+}
+
+export default function ArticleCreate() {
+  const { data, setData, post, processing, errors } = useForm<ArticleFormData>({
+    title: '',
+    content: '',
+    auto_extract: false,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    post('/articles', {
+      onSuccess: () => {
+        // 成功時の処理
+      },
+    });
+  };
+
+  return (
+    <form onSubmit={handleSubmit}>
+      {/* フォーム内容 */}
+    </form>
+  );
+}
+```
+
+#### 10.3.4 UIコンポーネント（Tailwind CSS）
+
+```typescript
+// resources/js/Components/Button.tsx
+
+interface ButtonProps {
+  type?: 'button' | 'submit' | 'reset';
+  variant?: 'primary' | 'secondary' | 'danger';
+  onClick?: () => void;
+  disabled?: boolean;
+  children: React.ReactNode;
+}
+
+export default function Button({
+  type = 'button',
+  variant = 'primary',
+  onClick,
+  disabled = false,
+  children,
+}: ButtonProps) {
+  const baseClasses = 'px-4 py-2 rounded font-medium transition-colors';
+  
+  const variantClasses = {
+    primary: 'bg-blue-600 text-white hover:bg-blue-700 disabled:bg-blue-300',
+    secondary: 'bg-gray-600 text-white hover:bg-gray-700 disabled:bg-gray-300',
+    danger: 'bg-red-600 text-white hover:bg-red-700 disabled:bg-red-300',
+  };
+  
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      disabled={disabled}
+      className={`${baseClasses} ${variantClasses[variant]}`}
+    >
+      {children}
+    </button>
+  );
+}
+```
+
+#### 10.3.5 レスポンシブ対応
+
+- **重要**: 本プロジェクトは管理画面のため、PC閲覧を前提とする
+- モバイル対応は**最小限**
+- テーブルはPC画面サイズで最適化
+- スマホ表示は考慮不要（アクセスしない想定）
+
+### 10.4 開発フロー
+
+#### 10.4.1 機能追加時の手順
+
+1. **マイグレーション作成**
+   ```bash
+   php artisan make:migration create_articles_table
+   ```
+
+2. **モデル作成**
+   ```bash
+   php artisan make:model Article
+   ```
+
+3. **コントローラー作成**
+   ```bash
+   php artisan make:controller ArticleController --resource
+   ```
+
+4. **FormRequest作成**
+   ```bash
+   php artisan make:request ArticleRequest
+   ```
+
+5. **Reactコンポーネント作成**
+   ```
+   resources/js/Pages/Articles/Index.tsx
+   resources/js/Pages/Articles/Create.tsx
+   resources/js/Pages/Articles/Edit.tsx
+   ```
+
+6. **ルート定義**
+   ```php
+   // routes/web.php
+   Route::middleware('auth')->group(function () {
+       Route::resource('articles', ArticleController::class);
+   });
+   ```
+
+#### 10.4.2 コード品質チェック
+
+```bash
+# PHP静的解析
+./vendor/bin/phpstan analyse
+
+# ESLint
+npm run lint
+
+# Prettier
+npm run format
+```
+
+### 10.5 環境変数設定
+
+#### .env.example
+
+```env
+# Gemini API
+GEMINI_API_KEY=
+GEMINI_MODEL=gemini-1.5-pro
+GEMINI_TIMEOUT=60
+GEMINI_MAX_RETRIES=3
+```
+
+#### config/services.php
+
+```php
+'gemini' => [
+    'api_key' => env('GEMINI_API_KEY'),
+    'model' => env('GEMINI_MODEL', 'gemini-1.5-pro'),
+    'timeout' => env('GEMINI_TIMEOUT', 60),
+    'max_retries' => env('GEMINI_MAX_RETRIES', 3),
+],
+```
+
+### 10.6 テスト方針
+
+#### 実装するテスト
+- **Feature Test**: 主要機能のE2Eテスト
+- **Unit Test**: サービスクラスのテスト
+
+#### テスト対象外
+- フロントエンドのユニットテスト（時間的制約により省略可）
+- インテグレーションテスト（小規模プロジェクトのため省略可）
+
+### 10.7 デプロイ前チェックリスト
+
+- [ ] .envファイルの設定（GEMINI_API_KEY等）
+- [ ] データベースマイグレーション実行
+- [ ] フロントエンドビルド（`npm run build`）
+- [ ] キャッシュクリア（`php artisan cache:clear`）
+- [ ] 設定キャッシュ（`php artisan config:cache`）
+- [ ] ルートキャッシュ（`php artisan route:cache`）
+- [ ] ストレージリンク（`php artisan storage:link`）
+
+### 10.8 その他の注意事項
+
+#### 日本語対応
+- すべてのメッセージ、エラー、バリデーションは日本語で記述
+- タイムゾーン: `Asia/Tokyo`
+- ロケール: `ja`
+
+#### セキュリティ
+- CSRF保護（Laravel標準、Inertia.js自動対応）
+- XSS対策（Reactの自動エスケープ）
+- SQLインジェクション対策（Eloquent ORM）
+- 認証必須（全画面）
+
+#### パフォーマンス
+- N+1クエリ対策（Eager Loading使用）
+- ページネーション（20件/ページ）
+- インデックス設定（頻繁に検索・ソートするカラム）
+
+---
+
+以上がProfileGen（プロフィールメーカー）の設計書です。
+
