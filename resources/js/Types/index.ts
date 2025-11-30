@@ -2,6 +2,8 @@ export interface Article {
   id: number;
   title: string;
   content: string;
+  url?: string | null;
+  image_urls?: string[] | null;
   created_at: string;
   updated_at: string;
 }
@@ -37,6 +39,28 @@ export interface Question {
   updated_at: string;
 }
 
+export interface Consultation {
+  id: number;
+  question: string;
+  answer: string;
+  user_id: number | null;
+  is_corrected: boolean;
+  created_at: string;
+  updated_at: string;
+  corrections?: Correction[];
+}
+
+export interface Correction {
+  id: number;
+  consultation_id: number;
+  wrong_answer: string;
+  correct_answer: string;
+  corrected_by: string | null;
+  created_at: string;
+  updated_at: string;
+  consultation?: Consultation;
+}
+
 export interface User {
   id: number;
   name: string;
@@ -69,5 +93,34 @@ export interface PageProps extends Record<string, any> {
     proposals_count: number;
   };
   recentProposals?: Proposal[];
+  consultations?: {
+    data: Consultation[];
+    current_page: number;
+    last_page: number;
+    links: Array<{ url: string | null; label: string; active: boolean }>;
+  };
+  consultation?: Consultation;
+}
+
+export interface Consultation {
+  id: number;
+  question: string;
+  answer: string;
+  user_id: number | null;
+  is_corrected: boolean;
+  created_at: string;
+  updated_at: string;
+  corrections?: Correction[];
+}
+
+export interface Correction {
+  id: number;
+  consultation_id: number;
+  wrong_answer: string;
+  correct_answer: string;
+  corrected_by: string | null;
+  created_at: string;
+  updated_at: string;
+  consultation?: Consultation;
 }
 

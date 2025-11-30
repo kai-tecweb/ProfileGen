@@ -12,5 +12,11 @@ class Article extends Model
     protected $fillable = [
         'title',
         'content',
+        'url',
+        'image_urls',
+    ];
+
+    protected $casts = [
+        'image_urls' => 'array',
     ];
 }
