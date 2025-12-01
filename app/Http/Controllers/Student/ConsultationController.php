@@ -73,7 +73,7 @@ class ConsultationController extends Controller
             // correctionsテーブルから過去の間違い事例を取得
             $corrections = Correction::with('consultation')
                 ->orderBy('created_at', 'desc')
-                ->limit(10)
+                ->limit(50)
                 ->get();
 
             $correctionsText = '';
