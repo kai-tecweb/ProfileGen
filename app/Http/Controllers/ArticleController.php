@@ -62,6 +62,16 @@ class ArticleController extends Controller
         // HTMLから本文を自動抽出する場合
         if ($request->boolean('auto_extract')) {
             Log::info("HTML自動抽出が有効");
+            
+            // HTMLから直接URLを抽出（元コンテンツで見つからなかった場合）
+            if (empty($extractedUrl)) {
+                Log::info("HTMLから直接URL抽出を試行");
+                $extractedUrl = $this->extractUrlFromHtml($content);
+                if ($extractedUrl) {
+                    Log::info("HTMLから直接URL抽出成功: {$extractedUrl}");
+                }
+            }
+            
             $extracted = $this->extractContentAndImagesFromHtml($content);
             $content = $extracted['content'];
             $imageUrls = $extracted['image_urls'];
@@ -127,6 +137,16 @@ class ArticleController extends Controller
         // HTMLから本文を自動抽出する場合
         if ($request->boolean('auto_extract')) {
             Log::info("HTML自動抽出が有効");
+            
+            // HTMLから直接URLを抽出（元コンテンツで見つからなかった場合）
+            if (empty($extractedUrl)) {
+                Log::info("HTMLから直接URL抽出を試行");
+                $extractedUrl = $this->extractUrlFromHtml($content);
+                if ($extractedUrl) {
+                    Log::info("HTMLから直接URL抽出成功: {$extractedUrl}");
+                }
+            }
+            
             $extracted = $this->extractContentAndImagesFromHtml($content);
             $content = $extracted['content'];
             $imageUrls = $extracted['image_urls'];
@@ -556,21 +576,31 @@ class ArticleController extends Controller
     private function extractUrlFromContent(string $content): ?string
     {
         if (empty($content)) {
+            Log::info("URL抽出: コンテンツが空です");
             return null;
         }
 
+        // HTMLから直接URLを抽出（HTML自動抽出が有効な場合）
+        if (strpos($content, '<a ') !== false || strpos($content, '<A ') !== false) {
+            Log::info("URL抽出: HTMLリンクタグを検出しました");
+            
+            // パターン1: `<a href="https://...">`
+            if (preg_match('/<a[^>]+href=["\'](https?:\/\/[^"\']+)["\'][^>]*>/i', $content, $matches)) {
+                $url = trim($matches[1]);
+                Log::info("URL抽出成功（HTMLリンクタグ）: {$url}");
+                return $url;
+            }
+        }
+
         // 共通URL抽出パターン（URLの末尾の空白、改行、各種記号を除外）
-        // URLは空白、改行、各種記号で終わるか、文字列の終端で終わる
-        // 改行文字（\r\n, \n, \r）と空白文字、各種記号を除外
         $urlPattern = '(https?:\/\/[^\s\r\n\)\]<>"\']+)';
 
         // パターン1: `**URL**: https://...` (Markdownのボールド表記)
         if (preg_match('/\*\*URL\*\*:\s*' . $urlPattern . '/i', $content, $matches)) {
             $url = trim($matches[1]);
-            // URLの末尾にある不正な文字を除去（改行、空白、句読点など）
             $url = preg_replace('/[\r\n\s]+.*$/', '', $url);
             $url = rtrim($url, '.,;:!?');
-            Log::info("URL抽出成功（パターン1）: {$url}");
+            Log::info("URL抽出成功（パターン1: **URL**:）: {$url}");
             return $url;
         }
 
@@ -579,7 +609,7 @@ class ArticleController extends Controller
             $url = trim($matches[1]);
             $url = preg_replace('/[\r\n\s]+.*$/', '', $url);
             $url = rtrim($url, '.,;:!?');
-            Log::info("URL抽出成功（パターン2）: {$url}");
+            Log::info("URL抽出成功（パターン2: - URL:）: {$url}");
             return $url;
         }
 
@@ -588,7 +618,7 @@ class ArticleController extends Controller
             $url = trim($matches[1]);
             $url = preg_replace('/[\r\n\s]+.*$/', '', $url);
             $url = rtrim($url, '.,;:!?');
-            Log::info("URL抽出成功（パターン3）: {$url}");
+            Log::info("URL抽出成功（パターン3: URL: 行頭）: {$url}");
             return $url;
         }
 
@@ -597,13 +627,73 @@ class ArticleController extends Controller
             $url = trim($matches[1]);
             $url = preg_replace('/[\r\n\s]+.*$/', '', $url);
             $url = rtrim($url, '.,;:!?');
-            Log::info("URL抽出成功（パターン4）: {$url}");
+            Log::info("URL抽出成功（パターン4: URL:）: {$url}");
             return $url;
         }
 
-        // デバッグ用: 内容の先頭200文字をログに記録
-        $preview = mb_substr($content, 0, 200);
-        Log::debug("URL抽出失敗: パターンにマッチしませんでした。内容の先頭200文字: {$preview}");
+        // パターン5: HTML内のURLを直接検索（リンクタグ以外）
+        if (preg_match('/\b(https?:\/\/[^\s<>"\']+)/i', $content, $matches)) {
+            $url = trim($matches[1]);
+            // 末尾の記号を除去
+            $url = rtrim($url, '.,;:!?');
+            Log::info("URL抽出成功（パターン5: 直接URL検索）: {$url}");
+            return $url;
+        }
+
+        // デバッグ用: 内容の先頭500文字をログに記録
+        $preview = mb_substr($content, 0, 500);
+        $hasHtml = (strpos($content, '<') !== false) ? 'あり' : 'なし';
+        $hasUrlKeyword = (stripos($content, 'URL') !== false) ? 'あり' : 'なし';
+        Log::info("URL抽出失敗: パターンにマッチしませんでした。HTML: {$hasHtml}, URLキーワード: {$hasUrlKeyword}, 内容の先頭500文字: " . str_replace(["\r", "\n"], ['\\r', '\\n'], $preview));
+        
+        return null;
+    }
+
+    /**
+     * HTMLから直接URLを抽出
+     * 主にリンクタグ（<a href="">）からURLを抽出
+     * 
+     * @param string $html
+     * @return string|null
+     */
+    private function extractUrlFromHtml(string $html): ?string
+    {
+        if (empty($html)) {
+            return null;
+        }
+
+        $url = null;
+
+        try {
+            $crawler = new Crawler($html);
+            
+            // リンクタグからURLを抽出
+            $crawler->filter('a')->each(function (Crawler $link) use (&$url) {
+                if ($url !== null) {
+                    return; // 既にURLが見つかっている場合は処理をスキップ
+                }
+                
+                $href = $link->attr('href');
+                if ($href && preg_match('/^https?:\/\//i', $href)) {
+                    $url = trim($href);
+                    Log::info("HTMLからURL抽出成功（リンクタグ）: {$url}");
+                }
+            });
+            
+            if ($url !== null) {
+                return $url;
+            }
+        } catch (\Exception $e) {
+            Log::warning("HTMLからのURL抽出でエラー: {$e->getMessage()}");
+        }
+
+        // リンクタグから見つからなかった場合、正規表現で直接検索
+        if (preg_match('/<a[^>]+href=["\'](https?:\/\/[^"\']+)["\'][^>]*>/i', $html, $matches)) {
+            $url = trim($matches[1]);
+            Log::info("HTMLからURL抽出成功（正規表現）: {$url}");
+            return $url;
+        }
+
         return null;
     }
 }
