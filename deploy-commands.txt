@@ -1,0 +1,27 @@
+# さくらサーバー上で実行するコマンド（手動実行用）
+
+# 1. ディレクトリ移動
+cd ~/www
+
+# 2. リポジトリをクローン（既に存在する場合はスキップ）
+git clone git@github.com:kai-tecweb/ProfileGen.git
+
+# 3. プロジェクトディレクトリに移動
+cd ProfileGen
+
+# 4. .envファイルの作成
+cp .env.sakura.example .env
+
+# 5. デプロイスクリプトを実行
+bash deploy-sakura.sh
+
+# または、手動で以下を実行:
+# composer install --no-dev --optimize-autoloader
+# php artisan key:generate
+# php artisan storage:link
+# php artisan migrate --force
+# npm ci --legacy-peer-deps
+# npm run build
+# php artisan config:cache
+# php artisan route:cache
+

@@ -79,9 +79,18 @@ export default function Create() {
                                     <InputLabel htmlFor="content" value="本文" />
                                     <textarea
                                         id="content"
-                                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 font-mono"
-                                        rows={25}
-                                        style={{ minHeight: '500px' }}
+                                        className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                                        style={{
+                                            minHeight: '500px',
+                                            whiteSpace: 'pre-wrap',
+                                            wordWrap: 'break-word',
+                                            fontSize: '14px',
+                                            lineHeight: '1.6',
+                                            fontFamily: data.auto_extract 
+                                                ? 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace'
+                                                : 'ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif',
+                                        }}
+                                        rows={20}
                                         value={data.content}
                                         onChange={(e) => setData('content', e.target.value)}
                                         required

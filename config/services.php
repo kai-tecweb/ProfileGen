@@ -35,11 +35,17 @@ return [
         ],
     ],
 
-    'gemini' => [
-        'api_key' => env('GEMINI_API_KEY'),
-        'model' => env('GEMINI_MODEL', 'gemini-1.5-pro'),
-        'timeout' => env('GEMINI_TIMEOUT', 60),
-        'max_retries' => env('GEMINI_MAX_RETRIES', 3),
-    ],
+        'gemini' => [
+            'api_key' => env('GEMINI_API_KEY'),
+            'model' => env('GEMINI_MODEL', 'gemini-2.5-flash'),
+            'timeout' => env('GEMINI_TIMEOUT', 60),
+            'max_retries' => env('GEMINI_MAX_RETRIES', 3),
+        ],
+
+        'discord' => [
+            'correction_webhook' => env('DISCORD_CORRECTION_WEBHOOK'),
+            'qa_webhook' => env('DISCORD_QA_WEBHOOK'),
+            'notify_all_qa' => env('DISCORD_NOTIFY_ALL_QA', false),
+        ],
 
 ];

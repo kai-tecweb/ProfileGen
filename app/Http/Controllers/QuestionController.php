@@ -27,7 +27,7 @@ class QuestionController extends Controller
 
         return Inertia::render('Questions/Index', [
             'questions' => $questions,
-        ]);
+        ])->with('errors', session('errors'));
     }
 
     /**
@@ -104,9 +104,8 @@ class QuestionController extends Controller
             $articles = Article::all();
 
             if ($articles->isEmpty()) {
-                return back()->withErrors([
-                    'error' => '記事が登録されていません。先に記事を登録してください。'
-                ]);
+                return redirect()->route('questions.index')
+                    ->with('error', '記事が登録されていません。先に記事を登録してください。');
             }
 
             // プロンプト生成
@@ -129,9 +128,8 @@ class QuestionController extends Controller
         } catch (\Exception $e) {
             Log::error('質問生成エラー: ' . $e->getMessage());
 
-            return back()->withErrors([
-                'error' => '質問の生成に失敗しました。しばらく時間をおいて再度お試しください。'
-            ]);
+            return redirect()->route('questions.index')
+                ->with('error', '質問の生成に失敗しました。しばらく時間をおいて再度お試しください。');
         }
     }
 
@@ -150,9 +148,8 @@ class QuestionController extends Controller
         } catch (\Exception $e) {
             Log::error('質問再生成エラー: ' . $e->getMessage());
 
-            return back()->withErrors([
-                'error' => '質問の再生成に失敗しました。'
-            ]);
+            return redirect()->route('questions.index')
+                ->with('error', '質問の再生成に失敗しました。');
         }
     }
 
@@ -164,11 +161,20 @@ class QuestionController extends Controller
         // 記事本文を結合
         $articlesContent = $articles->pluck('content')->implode("\n\n");
 
+        $articleCount = $articles->count();
+        
         $prompt = "以下の記事データを分析して、クライアントに対するヒアリング質問リストを作成してください。\n\n";
         $prompt .= "【記事データ】\n{$articlesContent}\n\n";
         $prompt .= "【要件】\n";
         $prompt .= "- ビジネス向けプロフィールと商品設計を作成するための質問\n";
-        $prompt .= "- 10〜15個程度の質問を生成\n";
+        
+        if ($articleCount < 3) {
+            $prompt .= "- 記事が少ないため、基本的な質問を中心に生成してください\n";
+            $prompt .= "- 10〜12個程度の質問を生成\n";
+        } else {
+            $prompt .= "- 10〜15個程度の質問を生成\n";
+        }
+        
         $prompt .= "- 具体的で答えやすい質問にする\n";
         $prompt .= "- **以下の基本質問を必ず含めてください**:\n";
         $prompt .= "  1. ターゲット顧客（年齢、性別、職業、悩み）\n";
@@ -177,7 +183,13 @@ class QuestionController extends Controller
         $prompt .= "  4. 価格帯\n";
         $prompt .= "  5. 提供方法（オンライン/オフライン等）\n";
         $prompt .= "  6. 顧客に提供したい未来\n";
-        $prompt .= "- 上記以外にも、記事データに基づいた追加の質問を生成してください\n\n";
+        
+        if ($articleCount >= 3) {
+            $prompt .= "- 上記以外にも、記事データに基づいた追加の質問を生成してください\n";
+        } else {
+            $prompt .= "- 記事データから読み取れる情報を参考に、関連する質問を追加してください\n";
+        }
+        $prompt .= "\n";
         $prompt .= "【出力形式】\n";
         $prompt .= "以下のJSON形式で必ず出力してください：\n\n";
         $prompt .= "{\n";

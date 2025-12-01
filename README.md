@@ -11,10 +11,10 @@
 
 ## 機能
 
-- 記事管理（HTMLパース機能付き）
-- クライアント管理
+- 記事管理（HTMLパース機能付き、画像URL抽出対応）
+- クライアント管理（ヒアリング回答機能付き）
 - 質問マスター管理（Gemini APIによる自動生成）
-- 提案生成（Gemini APIによる自動生成）
+- 提案生成（Gemini APIによる自動生成、マルチモーダル対応）
 
 ## セットアップ
 
@@ -39,44 +39,29 @@ php artisan key:generate
 # 3. データベース設定（.envファイルを編集）
 # DB_CONNECTION=mysql
 # DB_DATABASE=profilegen
-# ...
+# DB_USERNAME=...
+# DB_PASSWORD=...
+# GEMINI_API_KEY=...
 
 # 4. マイグレーション実行
 php artisan migrate
 
-# 5. 初期ユーザー作成（オプション）
+# 5. 初期ユーザー作成
 php artisan db:seed
+# デフォルトログイン情報:
+# メール: admin@example.com
+# パスワード: password
 
 # 6. フロントエンドビルド
 npm run build
-# または開発モード
-npm run dev
 
-# 7. サーバー起動
+# 7. 開発サーバー起動
 php artisan serve
+npm run dev  # 別ターミナルで
 ```
 
-### 開発モード
+## ドキュメント
 
-```bash
-# ターミナル1: Laravelサーバー
-php artisan serve
-
-# ターミナル2: Vite開発サーバー（ホットリロード）
-npm run dev
-```
-
-## 初期ログイン情報
-
-- **メールアドレス**: `admin@example.com`
-- **パスワード**: `password`
-
-⚠️ 本番環境では必ずパスワードを変更してください。
-
-## デプロイ
-
-デプロイ手順については `DEPLOY.md` または `DEPLOY_QUICK.md` を参照してください。
-
-## 設計書
-
-詳細な設計仕様は `DESIGN.md` を参照してください。
+- `DESIGN.md` - 設計書（機能要件、データベース設計、画面設計など）
+- `DEPLOY.md` - デプロイ手順
+- `docs/archive/` - 過去のトラブルシューティング用ドキュメント（参照用）

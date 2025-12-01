@@ -1,33 +1,80 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageProps } from '@/Types';
 import { Question } from '@/Types';
 import { route } from 'ziggy-js';
 import Button from '@/Components/Button';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import LoadingSpinner from '@/Components/LoadingSpinner';
 
 interface QuestionsIndexProps extends PageProps {
     questions: Question[];
 }
 
-export default function Index({ questions }: QuestionsIndexProps) {
+export default function Index({ questions: initialQuestions }: QuestionsIndexProps) {
+    const { flash } = usePage<QuestionsIndexProps>().props as any;
     const [copied, setCopied] = useState(false);
+    const [isGenerating, setIsGenerating] = useState(false);
+    const [questions, setQuestions] = useState(initialQuestions);
+
+    // フラッシュメッセージを3秒後に消す
+    useEffect(() => {
+        if (flash?.success || flash?.error) {
+            const timer = setTimeout(() => {
+                router.reload({ only: ['questions'] });
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [flash]);
+
+    // questionsが更新されたら状態を更新
+    useEffect(() => {
+        setQuestions(initialQuestions);
+    }, [initialQuestions]);
 
     const handleDelete = (id: number) => {
         if (confirm('この質問を削除してもよろしいですか？')) {
-            router.delete(route('questions.destroy', id));
+            router.delete(route('questions.destroy', id), {
+                preserveScroll: true,
+            });
         }
     };
 
     const handleGenerate = () => {
         if (confirm('質問を生成しますか？既存の質問がある場合は、先に確認してください。')) {
-            router.post(route('questions.generate'));
+            setIsGenerating(true);
+            router.post(
+                route('questions.generate'),
+                {},
+                {
+                    preserveScroll: false,
+                    onSuccess: () => {
+                        setIsGenerating(false);
+                    },
+                    onError: () => {
+                        setIsGenerating(false);
+                    },
+                    onFinish: () => {
+                        setIsGenerating(false);
+                    },
+                }
+            );
         }
     };
 
     const handleRegenerate = () => {
         if (confirm('すべての質問を削除して再生成しますか？クライアントの回答は保持されます。')) {
-            router.post(route('questions.regenerate'));
+            setIsGenerating(true);
+            router.post(
+                route('questions.regenerate'),
+                {},
+                {
+                    preserveScroll: false,
+                    onFinish: () => {
+                        setIsGenerating(false);
+                    },
+                }
+            );
         }
     };
 
@@ -55,11 +102,13 @@ export default function Index({ questions }: QuestionsIndexProps) {
                     </h2>
                     <div className="space-x-2">
                         {questions.length === 0 ? (
-                            <Button onClick={handleGenerate}>質問を生成</Button>
+                            <Button onClick={handleGenerate} disabled={isGenerating}>
+                                {isGenerating ? '生成中...' : '質問を生成'}
+                            </Button>
                         ) : (
                             <>
-                                <Button onClick={handleRegenerate} variant="secondary">
-                                    質問を再生成
+                                <Button onClick={handleRegenerate} variant="secondary" disabled={isGenerating}>
+                                    {isGenerating ? '再生成中...' : '質問を再生成'}
                                 </Button>
                                 <Button onClick={handleCopyQuestions} variant="secondary">
                                     {copied ? 'コピーしました！' : '質問テキストをコピー'}
@@ -79,6 +128,25 @@ export default function Index({ questions }: QuestionsIndexProps) {
                 <div className="mx-auto max-w-7xl sm:px-6 lg:px-8">
                     <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                         <div className="p-6">
+                            {isGenerating && (
+                                <div className="mb-4 flex items-center gap-2">
+                                    <LoadingSpinner size="sm" />
+                                    <p className="text-sm text-gray-600">質問を生成中です。しばらくお待ちください...</p>
+                                </div>
+                            )}
+
+                            {flash?.success && (
+                                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-md">
+                                    <p className="text-sm text-green-800">{flash.success}</p>
+                                </div>
+                            )}
+
+                            {flash?.error && (
+                                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-md">
+                                    <p className="text-sm text-red-800">{flash.error}</p>
+                                </div>
+                            )}
+
                             {questions.length > 0 ? (
                                 <>
                                     <div className="mb-4">
@@ -133,7 +201,9 @@ export default function Index({ questions }: QuestionsIndexProps) {
                             ) : (
                                 <div className="text-center py-12">
                                     <p className="text-gray-500 mb-4">質問が登録されていません</p>
-                                    <Button onClick={handleGenerate}>質問を生成</Button>
+                                    <Button onClick={handleGenerate} disabled={isGenerating}>
+                                        {isGenerating ? '生成中...' : '質問を生成'}
+                                    </Button>
                                 </div>
                             )}
                         </div>
@@ -143,4 +213,3 @@ export default function Index({ questions }: QuestionsIndexProps) {
         </AuthenticatedLayout>
     );
 }
-
