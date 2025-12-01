@@ -18,9 +18,6 @@ return new class extends Migration
             $table->foreignId('user_id')->nullable()->constrained()->onDelete('cascade');
             $table->boolean('is_corrected')->default(false);
             $table->timestamps();
-            
-            // 質問文の検索高速化用インデックス
-            $table->index('question');
         });
     }
 
