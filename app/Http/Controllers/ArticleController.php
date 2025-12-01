@@ -54,18 +54,25 @@ class ArticleController extends Controller
         $content = $validated['content'];
         $imageUrls = [];
 
+        // まず、元のコンテンツ（HTMLまたはMarkdown）からURLを抽出
+        Log::info("URL抽出処理開始（元コンテンツ）: コンテンツの長さ = " . strlen($content));
+        $extractedUrl = $this->extractUrlFromContent($content);
+        Log::info("記事保存: 抽出されたURL（元コンテンツ） = " . ($extractedUrl ?? 'null'));
+
         // HTMLから本文を自動抽出する場合
         if ($request->boolean('auto_extract')) {
             Log::info("HTML自動抽出が有効");
             $extracted = $this->extractContentAndImagesFromHtml($content);
             $content = $extracted['content'];
             $imageUrls = $extracted['image_urls'];
+            
+            // HTML抽出後のコンテンツからもURLを抽出してみる（元コンテンツで見つからなかった場合）
+            if (empty($extractedUrl)) {
+                Log::info("URL抽出処理開始（HTML抽出後）: コンテンツの長さ = " . strlen($content));
+                $extractedUrl = $this->extractUrlFromContent($content);
+                Log::info("記事保存: 抽出されたURL（HTML抽出後） = " . ($extractedUrl ?? 'null'));
+            }
         }
-
-        // Markdown本文からURLを自動抽出
-        Log::info("URL抽出処理開始: コンテンツの長さ = " . strlen($content));
-        $extractedUrl = $this->extractUrlFromContent($content);
-        Log::info("記事保存: 抽出されたURL = " . ($extractedUrl ?? 'null'));
 
         $article = Article::create([
             'title' => $validated['title'],
@@ -112,18 +119,25 @@ class ArticleController extends Controller
         $content = $validated['content'];
         $imageUrls = $article->image_urls ?? [];
 
+        // まず、元のコンテンツ（HTMLまたはMarkdown）からURLを抽出
+        Log::info("URL抽出処理開始（元コンテンツ）: コンテンツの長さ = " . strlen($content));
+        $extractedUrl = $this->extractUrlFromContent($content);
+        Log::info("記事更新: 抽出されたURL（元コンテンツ） = " . ($extractedUrl ?? 'null'));
+
         // HTMLから本文を自動抽出する場合
         if ($request->boolean('auto_extract')) {
             Log::info("HTML自動抽出が有効");
             $extracted = $this->extractContentAndImagesFromHtml($content);
             $content = $extracted['content'];
             $imageUrls = $extracted['image_urls'];
+            
+            // HTML抽出後のコンテンツからもURLを抽出してみる（元コンテンツで見つからなかった場合）
+            if (empty($extractedUrl)) {
+                Log::info("URL抽出処理開始（HTML抽出後）: コンテンツの長さ = " . strlen($content));
+                $extractedUrl = $this->extractUrlFromContent($content);
+                Log::info("記事更新: 抽出されたURL（HTML抽出後） = " . ($extractedUrl ?? 'null'));
+            }
         }
-
-        // Markdown本文からURLを自動抽出
-        Log::info("URL抽出処理開始: コンテンツの長さ = " . strlen($content));
-        $extractedUrl = $this->extractUrlFromContent($content);
-        Log::info("記事更新: 抽出されたURL = " . ($extractedUrl ?? 'null'));
 
         $article->update([
             'title' => $validated['title'],
