@@ -232,9 +232,22 @@ php artisan migrate --force
 # フロントエンドをビルド
 npm run build
 
-# キャッシュを再構築
+# ビルドファイルをサーバーにアップロード（ローカルから）
+rsync -avz --delete public/build/ navyracoon2@navyracoon2.sakura.ne.jp:www/ProfileGen/public/build/
+
+# キャッシュをクリア（サーバー上で実行）
+php artisan config:clear
+php artisan cache:clear
+php artisan route:clear
+php artisan view:clear
+
+# または、キャッシュを再構築（本番環境推奨）
 php artisan config:cache
 php artisan route:cache
 php artisan view:cache
 ```
+
+## 最終更新日
+
+- **2025年12月4日**: ドキュメント整理、相談チャット機能の4段階構造実装完了
 
