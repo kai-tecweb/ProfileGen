@@ -12,9 +12,10 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface ConsultationsIndexProps {
     consultations: Consultation[];
+    new_consultation?: Consultation | null;
 }
 
-export default function Index({ consultations: initialConsultations }: ConsultationsIndexProps) {
+export default function Index({ consultations: initialConsultations, new_consultation: initialNew }: ConsultationsIndexProps) {
     const page = usePage();
     const flash = (page.props as any).flash || {};
     const [consultations, setConsultations] = useState(initialConsultations);
@@ -23,7 +24,14 @@ export default function Index({ consultations: initialConsultations }: Consultat
 
     useEffect(() => {
         setConsultations(initialConsultations);
-    }, [initialConsultations]);
+        // 新しい相談があった場合、リストの先頭に追加（まだ存在しない場合）
+        if (initialNew) {
+            const exists = initialConsultations.some(c => c.id === initialNew.id);
+            if (!exists) {
+                setConsultations([initialNew, ...initialConsultations]);
+            }
+        }
+    }, [initialConsultations, initialNew]);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         question: '',
@@ -197,10 +205,12 @@ export default function Index({ consultations: initialConsultations }: Consultat
                                                                             <div className="flex items-center mb-1">
                                                                                 <span className="font-bold text-sm text-blue-600">💡 要約</span>
                                                                             </div>
-                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900 prose-li:my-2 prose-ul:space-y-2">
+                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
                                                                                 <ReactMarkdown
                                                                                     remarkPlugins={[remarkGfm]}
                                                                                     components={{
+                                                                                        ul: ({node, ...props}: any) => <ul className="space-y-2 my-2" {...props} />,
+                                                                                        li: ({node, ...props}: any) => <li className="my-2" {...props} />,
                                                                                         code({node, inline, className, children, ...props}: any) {
                                                                                             const match = /language-(\w+)/.exec(className || '');
                                                                                             return !inline && match ? (
@@ -232,10 +242,12 @@ export default function Index({ consultations: initialConsultations }: Consultat
                                                                             <div className="flex items-center mb-1">
                                                                                 <span className="font-bold text-sm text-yellow-700">✅ 今すぐやること</span>
                                                                             </div>
-                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900 prose-li:my-2 prose-ul:space-y-2">
+                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
                                                                                 <ReactMarkdown
                                                                                     remarkPlugins={[remarkGfm]}
                                                                                     components={{
+                                                                                        ul: ({node, ...props}: any) => <ul className="space-y-2 my-2" {...props} />,
+                                                                                        li: ({node, ...props}: any) => <li className="my-2" {...props} />,
                                                                                         code({node, inline, className, children, ...props}: any) {
                                                                                             const match = /language-(\w+)/.exec(className || '');
                                                                                             return !inline && match ? (
@@ -267,10 +279,12 @@ export default function Index({ consultations: initialConsultations }: Consultat
                                                                             <div className="flex items-center mb-1">
                                                                                 <span className="font-bold text-sm text-green-700">💬 アドバイス</span>
                                                                             </div>
-                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900 prose-li:my-2 prose-ul:space-y-2">
+                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
                                                                                 <ReactMarkdown
                                                                                     remarkPlugins={[remarkGfm]}
                                                                                     components={{
+                                                                                        ul: ({node, ...props}: any) => <ul className="space-y-2 my-2" {...props} />,
+                                                                                        li: ({node, ...props}: any) => <li className="my-2" {...props} />,
                                                                                         code({node, inline, className, children, ...props}: any) {
                                                                                             const match = /language-(\w+)/.exec(className || '');
                                                                                             return !inline && match ? (
@@ -311,7 +325,7 @@ export default function Index({ consultations: initialConsultations }: Consultat
                                                                                     <div className="flex items-center mb-1">
                                                                                         <span className="font-bold text-sm text-gray-600">📖 詳細</span>
                                                                                     </div>
-                                                                                    <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900 prose-li:my-2 prose-ul:space-y-2">
+                                                                                    <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
                                                                                         <ReactMarkdown
                                                                                             remarkPlugins={[remarkGfm]}
                                                                                             components={{

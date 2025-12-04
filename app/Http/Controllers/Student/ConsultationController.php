@@ -29,8 +29,12 @@ class ConsultationController extends Controller
             ->limit(20)
             ->get();
 
+        // セッションから新しい相談を取得（重複質問の場合）
+        $newConsultation = session('new_consultation');
+
         return Inertia::render('Student/Consultations/Index', [
             'consultations' => $consultations,
+            'new_consultation' => $newConsultation,
         ]);
     }
 
@@ -76,8 +80,10 @@ class ConsultationController extends Controller
                 'answer_length' => $newConsultation->answer ? strlen($newConsultation->answer) : 0,
             ]);
 
+            // セッションに新しい相談を追加（リダイレクト直後に確実に表示されるように）
             return redirect()->route('student.consultations.index')
-                ->with('warning', '⚠️ この質問は過去に同じ質問があります。既存の回答を表示しています。');
+                ->with('warning', '⚠️ この質問は過去に同じ質問があります。既存の回答を表示しています。')
+                ->with('new_consultation', $newConsultation);
         }
 
         // 新規質問の場合
