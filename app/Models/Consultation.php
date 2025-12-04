@@ -15,6 +15,7 @@ class Consultation extends Model
         'question',
         'answer',
         'user_id',
+        'student_id',
         'is_corrected',
     ];
 
@@ -23,11 +24,19 @@ class Consultation extends Model
     ];
 
     /**
-     * ユーザーとのリレーション
+     * ユーザー（管理者）とのリレーション
      */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * 生徒とのリレーション
+     */
+    public function student(): BelongsTo
+    {
+        return $this->belongsTo(Student::class);
     }
 
     /**

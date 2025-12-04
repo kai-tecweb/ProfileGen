@@ -68,6 +68,21 @@ export interface User {
   email_verified_at?: string | null;
 }
 
+export interface Student {
+  id: number;
+  discord_name: string;
+  email: string;
+  status: 'pending' | 'approved' | 'rejected';
+  student_status: 'active' | 'inactive' | 'banned' | 'no_contact';
+  approved_at: string | null;
+  approved_by: number | null;
+  memo: string | null;
+  created_at: string;
+  updated_at: string;
+  approver?: User | null;
+  consultations?: Consultation[];
+}
+
 export interface PageProps extends Record<string, any> {
   auth: {
     user: User;

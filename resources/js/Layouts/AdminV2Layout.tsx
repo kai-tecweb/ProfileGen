@@ -27,6 +27,12 @@ export default function AdminV2Layout({
                                     相談履歴管理
                                 </Link>
                                 <Link
+                                    href={route('admin.students.index')}
+                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-indigo-700 transition duration-150 ease-in-out"
+                                >
+                                    生徒管理
+                                </Link>
+                                <Link
                                     href={route('articles.index')}
                                     className="inline-flex items-center px-1 pt-1 text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-indigo-700 transition duration-150 ease-in-out"
                                 >

@@ -9,6 +9,7 @@ use App\Models\Correction;
 use App\Services\GeminiApiService;
 use App\Services\DiscordService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Session;
 use Inertia\Inertia;
 use Inertia\Response;
 use Illuminate\Support\Facades\Log;
@@ -25,7 +26,11 @@ class ConsultationController extends Controller
      */
     public function index(): Response
     {
-        $consultations = Consultation::orderBy('created_at', 'desc')
+        $studentId = Session::get('student_id');
+
+        // ログイン中の生徒の相談のみを取得
+        $consultations = Consultation::where('student_id', $studentId)
+            ->orderBy('created_at', 'desc')
             ->limit(20)
             ->get();
 
@@ -51,9 +56,12 @@ class ConsultationController extends Controller
         
         // 質問文の正規化（小文字、空白除去）して完全一致チェック
         $normalizedQuestion = $this->normalizeQuestion($question);
-        
-        // 既存の同じ質問を検索（正規化した質問文で完全一致チェック）
-        $existingConsultation = Consultation::whereRaw('LOWER(TRIM(question)) = ?', [strtolower($normalizedQuestion)])
+
+        $studentId = Session::get('student_id');
+
+        // 同じ生徒の既存の同じ質問を検索（正規化した質問文で完全一致チェック）
+        $existingConsultation = Consultation::where('student_id', $studentId)
+            ->whereRaw('LOWER(TRIM(question)) = ?', [strtolower($normalizedQuestion)])
             ->orderBy('created_at', 'desc')
             ->first();
 
@@ -61,6 +69,7 @@ class ConsultationController extends Controller
             // 重複質問でも新しいレコードを保存（履歴に表示するため）
             \Log::info('重複質問検出', [
                 'question' => $question,
+                'student_id' => $studentId,
                 'existing_id' => $existingConsultation->id,
                 'existing_answer' => $existingConsultation->answer ? 'あり' : 'なし',
                 'existing_answer_length' => $existingConsultation->answer ? strlen($existingConsultation->answer) : 0,
@@ -69,6 +78,7 @@ class ConsultationController extends Controller
             $newConsultation = Consultation::create([
                 'question' => $question,
                 'answer' => $existingConsultation->answer,  // 既存の回答を使用
+                'student_id' => $studentId,
                 'user_id' => null, // 学生側はuser_idなし
                 'is_corrected' => $existingConsultation->is_corrected,
             ]);
@@ -164,9 +174,11 @@ class ConsultationController extends Controller
             $answer = $this->geminiService->generateConsultationAnswer($prompt);
 
             // DBに保存
+            $studentId = Session::get('student_id');
             $consultation = Consultation::create([
                 'question' => $question,
                 'answer' => $answer,
+                'student_id' => $studentId,
                 'user_id' => null, // 学生側はuser_idなし
             ]);
 

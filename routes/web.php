@@ -8,8 +8,10 @@ use App\Http\Controllers\ProposalController;
 use App\Http\Controllers\QuestionController;
 use App\Http\Controllers\Student\AuthController as StudentAuthController;
 use App\Http\Controllers\Student\ConsultationController as StudentConsultationController;
+use App\Http\Controllers\Student\RegisterController as StudentRegisterController;
 use App\Http\Controllers\AdminV2\AuthController as AdminV2AuthController;
 use App\Http\Controllers\AdminV2\ConsultationController as AdminV2ConsultationController;
+use App\Http\Controllers\AdminV2\StudentController as AdminV2StudentController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -47,6 +49,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 // 学生エリア（パスワード認証）
 Route::prefix('student')->group(function () {
+    // 申請ページ（認証不要）
+    Route::get('/register', [StudentRegisterController::class, 'create'])->name('student.register');
+    Route::post('/register', [StudentRegisterController::class, 'store']);
+    Route::get('/register/success', [StudentRegisterController::class, 'success'])->name('student.register.success');
+    
     Route::get('/login', [StudentAuthController::class, 'showLoginForm'])->name('student.login');
     Route::post('/login', [StudentAuthController::class, 'login']);
     Route::post('/logout', [StudentAuthController::class, 'logout'])->name('student.logout');
@@ -70,6 +77,14 @@ Route::prefix('admin')->group(function () {
         
         // 記事管理（ナレッジ管理）
         Route::resource('articles', ArticleController::class);
+        
+        // 生徒管理
+        Route::get('/students/pending', [AdminV2StudentController::class, 'pending'])->name('admin.students.pending');
+        Route::get('/students', [AdminV2StudentController::class, 'index'])->name('admin.students.index');
+        Route::get('/students/{student}', [AdminV2StudentController::class, 'show'])->name('admin.students.show');
+        Route::post('/students/{student}/approve', [AdminV2StudentController::class, 'approve'])->name('admin.students.approve');
+        Route::post('/students/{student}/reject', [AdminV2StudentController::class, 'reject'])->name('admin.students.reject');
+        Route::patch('/students/{student}/status', [AdminV2StudentController::class, 'updateStatus'])->name('admin.students.updateStatus');
     });
 });
 
