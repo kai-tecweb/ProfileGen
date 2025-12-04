@@ -12,10 +12,9 @@ import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface ConsultationsIndexProps {
     consultations: Consultation[];
-    existing_consultation?: Consultation | null;
 }
 
-export default function Index({ consultations: initialConsultations, existing_consultation: initialExisting }: ConsultationsIndexProps) {
+export default function Index({ consultations: initialConsultations }: ConsultationsIndexProps) {
     const page = usePage();
     const flash = (page.props as any).flash || {};
     const [consultations, setConsultations] = useState(initialConsultations);
@@ -24,14 +23,7 @@ export default function Index({ consultations: initialConsultations, existing_co
 
     useEffect(() => {
         setConsultations(initialConsultations);
-        // 既存の相談があった場合、リストに追加（まだ存在しない場合）
-        if (initialExisting) {
-            const exists = initialConsultations.some(c => c.id === initialExisting.id);
-            if (!exists) {
-                setConsultations([initialExisting, ...initialConsultations]);
-            }
-        }
-    }, [initialConsultations, initialExisting]);
+    }, [initialConsultations]);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         question: '',

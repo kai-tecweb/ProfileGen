@@ -29,12 +29,8 @@ class ConsultationController extends Controller
             ->limit(20)
             ->get();
 
-        // セッションから既存の相談を取得（既存質問の場合）
-        $existingConsultation = session('existing_consultation');
-
         return Inertia::render('Student/Consultations/Index', [
             'consultations' => $consultations,
-            'existing_consultation' => $existingConsultation,
         ]);
     }
 
@@ -58,10 +54,16 @@ class ConsultationController extends Controller
             ->first();
 
         if ($existingConsultation) {
-            // 既存回答がある場合
+            // 重複質問でも新しいレコードを保存（履歴に表示するため）
+            $newConsultation = Consultation::create([
+                'question' => $question,
+                'answer' => $existingConsultation->answer,  // 既存の回答を使用
+                'user_id' => null, // 学生側はuser_idなし
+                'is_corrected' => $existingConsultation->is_corrected,
+            ]);
+
             return redirect()->route('student.consultations.index')
-                ->with('warning', '同じ質問なので同じ回答をします')
-                ->with('existing_consultation', $existingConsultation);
+                ->with('warning', '⚠️ この質問は過去に同じ質問があります。既存の回答を表示しています。');
         }
 
         // 新規質問の場合
