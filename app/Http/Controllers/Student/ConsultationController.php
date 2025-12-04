@@ -55,11 +55,25 @@ class ConsultationController extends Controller
 
         if ($existingConsultation) {
             // 重複質問でも新しいレコードを保存（履歴に表示するため）
+            \Log::info('重複質問検出', [
+                'question' => $question,
+                'existing_id' => $existingConsultation->id,
+                'existing_answer' => $existingConsultation->answer ? 'あり' : 'なし',
+                'existing_answer_length' => $existingConsultation->answer ? strlen($existingConsultation->answer) : 0,
+            ]);
+            
             $newConsultation = Consultation::create([
                 'question' => $question,
                 'answer' => $existingConsultation->answer,  // 既存の回答を使用
                 'user_id' => null, // 学生側はuser_idなし
                 'is_corrected' => $existingConsultation->is_corrected,
+            ]);
+            
+            \Log::info('新しいレコード作成', [
+                'id' => $newConsultation->id,
+                'question' => $newConsultation->question,
+                'answer' => $newConsultation->answer ? 'あり' : 'なし',
+                'answer_length' => $newConsultation->answer ? strlen($newConsultation->answer) : 0,
             ]);
 
             return redirect()->route('student.consultations.index')
