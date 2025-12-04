@@ -11,6 +11,8 @@ return new class extends Migration
      */
     public function up(): void
     {
+        $connection = Schema::getConnection();
+        
         // カラムが存在しない場合のみ追加
         if (!Schema::hasColumn('consultations', 'student_id')) {
             Schema::table('consultations', function (Blueprint $table) {
@@ -18,32 +20,30 @@ return new class extends Migration
             });
         }
 
-        // インデックスが存在しない場合のみ追加
-        Schema::table('consultations', function (Blueprint $table) {
-            $indexes = Schema::getConnection()->getDoctrineSchemaManager()->listTableIndexes('consultations');
-            $hasIndex = false;
-            foreach ($indexes as $index) {
-                if (in_array('student_id', $index->getColumns())) {
-                    $hasIndex = true;
-                    break;
-                }
-            }
-            if (!$hasIndex) {
+        // インデックスが存在しない場合のみ追加（SQLで確認）
+        $indexExists = $connection->selectOne(
+            "SELECT COUNT(*) as count FROM information_schema.statistics 
+             WHERE table_schema = DATABASE() 
+             AND table_name = 'consultations' 
+             AND index_name = 'consultations_student_id_index'"
+        );
+        
+        if ($indexExists->count == 0) {
+            Schema::table('consultations', function (Blueprint $table) {
                 $table->index('student_id');
-            }
-        });
-
-        // 外部キー制約が存在しない場合のみ追加
-        $foreignKeys = Schema::getConnection()->getDoctrineSchemaManager()->listTableForeignKeys('consultations');
-        $hasForeignKey = false;
-        foreach ($foreignKeys as $foreignKey) {
-            if (in_array('student_id', $foreignKey->getColumns())) {
-                $hasForeignKey = true;
-                break;
-            }
+            });
         }
 
-        if (!$hasForeignKey) {
+        // 外部キー制約が存在しない場合のみ追加（SQLで確認）
+        $foreignKeyExists = $connection->selectOne(
+            "SELECT COUNT(*) as count FROM information_schema.key_column_usage 
+             WHERE table_schema = DATABASE() 
+             AND table_name = 'consultations' 
+             AND column_name = 'student_id' 
+             AND referenced_table_name IS NOT NULL"
+        );
+        
+        if ($foreignKeyExists->count == 0) {
             Schema::table('consultations', function (Blueprint $table) {
                 $table->foreign('student_id')->references('id')->on('students')->onDelete('cascade');
             });
