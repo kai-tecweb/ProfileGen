@@ -6,6 +6,9 @@ import Button from '@/Components/Button';
 import LoadingSpinner from '@/Components/LoadingSpinner';
 import { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface ConsultationsIndexProps {
     consultations: Consultation[];
@@ -174,8 +177,29 @@ export default function Index({ consultations: initialConsultations, existing_co
                                                 {/* 回答（左側） */}
                                                 <div className="flex justify-start">
                                                     <div className="max-w-2xl bg-gray-100 rounded-lg p-4">
-                                                        <div className="text-sm text-gray-700 prose prose-sm max-w-none">
-                                                            <ReactMarkdown>
+                                                        <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                                            <ReactMarkdown
+                                                                remarkPlugins={[remarkGfm]}
+                                                                components={{
+                                                                    code({node, inline, className, children, ...props}: any) {
+                                                                        const match = /language-(\w+)/.exec(className || '');
+                                                                        return !inline && match ? (
+                                                                            <SyntaxHighlighter
+                                                                                style={vscDarkPlus}
+                                                                                language={match[1]}
+                                                                                PreTag="div"
+                                                                                {...props}
+                                                                            >
+                                                                                {String(children).replace(/\n$/, '')}
+                                                                            </SyntaxHighlighter>
+                                                                        ) : (
+                                                                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                                                {children}
+                                                                            </code>
+                                                                        );
+                                                                    }
+                                                                }}
+                                                            >
                                                                 {consultation.answer}
                                                             </ReactMarkdown>
                                                         </div>

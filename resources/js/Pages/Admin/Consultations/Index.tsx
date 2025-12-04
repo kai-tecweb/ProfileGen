@@ -8,6 +8,9 @@ import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import { useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter';
+import { vscDarkPlus } from 'react-syntax-highlighter/dist/esm/styles/prism';
 
 interface AdminConsultationsIndexProps extends PageProps {
     consultations: {
@@ -198,8 +201,29 @@ export default function Index({ consultations }: AdminConsultationsIndexProps) {
                         <div className="mb-4">
                             <InputLabel htmlFor="original_answer" value="元の回答" />
                             <div className="mt-1 p-3 bg-yellow-50 rounded-md border border-yellow-300 max-h-96 overflow-y-auto">
-                                <div className="text-sm text-gray-700 prose prose-sm max-w-none">
-                                    <ReactMarkdown>
+                                <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                    <ReactMarkdown
+                                        remarkPlugins={[remarkGfm]}
+                                        components={{
+                                            code({node, inline, className, children, ...props}: any) {
+                                                const match = /language-(\w+)/.exec(className || '');
+                                                return !inline && match ? (
+                                                    <SyntaxHighlighter
+                                                        style={vscDarkPlus}
+                                                        language={match[1]}
+                                                        PreTag="div"
+                                                        {...props}
+                                                    >
+                                                        {String(children).replace(/\n$/, '')}
+                                                    </SyntaxHighlighter>
+                                                ) : (
+                                                    <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                        {children}
+                                                    </code>
+                                                );
+                                            }
+                                        }}
+                                    >
                                         {selectedConsultation.answer}
                                     </ReactMarkdown>
                                 </div>
