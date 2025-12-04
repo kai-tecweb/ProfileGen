@@ -31,5 +31,5 @@ deploy-*.sh
 *.tar.gz
 *.zip
 
-# アーカイブ（必要に応じて参照可能）
-docs/archive/
+# アーカイブ（整理済みドキュメントはGitに含める）
+# docs/archive/ は履歴として保持するため、Gitに含める
