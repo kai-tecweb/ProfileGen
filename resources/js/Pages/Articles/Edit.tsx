@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AdminV2Layout from '@/Layouts/AdminV2Layout';
 import { Head, useForm, Link } from '@inertiajs/react';
 import { PageProps } from '@/Types';
 import { route } from 'ziggy-js';
@@ -30,7 +30,7 @@ export default function Edit({ article }: ArticlesEditProps) {
     };
 
     return (
-        <AuthenticatedLayout
+        <AdminV2Layout
             header={
                 <h2 className="text-xl font-semibold leading-tight text-gray-800">
                     記事編集
@@ -114,7 +114,7 @@ export default function Edit({ article }: ArticlesEditProps) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </AdminV2Layout>
     );
 }
 

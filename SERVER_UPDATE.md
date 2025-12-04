@@ -8,7 +8,14 @@
 ### 1. サーバーにSSH接続
 
 ```bash
-ssh conoha
+# エイリアスを使用
+ssh sakura
+
+# または直接接続
+ssh navyracoon2@navyracoon2.sakura.ne.jp
+
+# パスワード認証を使用する場合（sshpassが必要）
+sshpass -p 'パスワード' ssh navyracoon2@navyracoon2.sakura.ne.jp
 ```
 
 ### 2. プロジェクトディレクトリに移動

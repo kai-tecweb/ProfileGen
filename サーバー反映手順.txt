@@ -5,7 +5,11 @@
 【重要】以下のコマンドをサーバー側で実行してください
 
 1. サーバーにSSH接続
-   ssh conoha
+   ssh sakura
+   または
+   ssh navyracoon2@navyracoon2.sakura.ne.jp
+   または（パスワード認証）
+   sshpass -p 'パスワード' ssh navyracoon2@navyracoon2.sakura.ne.jp
 
 2. プロジェクトディレクトリに移動
    cd ~/www/ProfileGen

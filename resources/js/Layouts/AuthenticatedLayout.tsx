@@ -17,6 +17,10 @@ export default function Authenticated({
     const [showingNavigationDropdown, setShowingNavigationDropdown] =
         useState(false);
 
+    // userがnullの場合のデフォルト値
+    const userName = user?.name || 'ゲスト';
+    const userEmail = user?.email || '';
+
     return (
         <div className="min-h-screen bg-gray-100">
             <nav className="border-b border-gray-100 bg-white">
@@ -66,7 +70,7 @@ export default function Authenticated({
                                                 type="button"
                                                 className="inline-flex items-center rounded-md border border-transparent bg-white px-3 py-2 text-sm font-medium leading-4 text-gray-500 transition duration-150 ease-in-out hover:text-gray-700 focus:outline-none"
                                             >
-                                                {user.name}
+                                                {userName}
 
                                                 <svg
                                                     className="-me-0.5 ms-2 h-4 w-4"
@@ -181,11 +185,13 @@ export default function Authenticated({
                     <div className="border-t border-gray-200 pb-1 pt-4">
                         <div className="px-4">
                             <div className="text-base font-medium text-gray-800">
-                                {user.name}
+                                {userName}
                             </div>
-                            <div className="text-sm font-medium text-gray-500">
-                                {user.email}
-                            </div>
+                            {userEmail && (
+                                <div className="text-sm font-medium text-gray-500">
+                                    {userEmail}
+                                </div>
+                            )}
                         </div>
 
                         <div className="mt-3 space-y-1">

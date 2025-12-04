@@ -10,7 +10,6 @@ use App\Http\Controllers\Student\AuthController as StudentAuthController;
 use App\Http\Controllers\Student\ConsultationController as StudentConsultationController;
 use App\Http\Controllers\AdminV2\AuthController as AdminV2AuthController;
 use App\Http\Controllers\AdminV2\ConsultationController as AdminV2ConsultationController;
-use App\Http\Controllers\Admin\ConsultationKnowledgeController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -22,9 +21,6 @@ Route::get('/', function () {
 Route::middleware(['auth', 'verified'])->group(function () {
     // ダッシュボード
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
-
-    // 記事管理
-    Route::resource('articles', ArticleController::class);
 
     // クライアント管理
     Route::resource('clients', ClientController::class);
@@ -72,11 +68,8 @@ Route::prefix('admin')->group(function () {
         Route::post('/consultations/{consultation}/correct', [AdminV2ConsultationController::class, 'correct'])->name('admin.consultations.correct');
         Route::post('/consultations/{consultation}/notify', [AdminV2ConsultationController::class, 'notifyDiscord'])->name('admin.consultations.notify');
         
-        // 相談チャット用ナレッジ管理
-        Route::get('/consultation-knowledge', [ConsultationKnowledgeController::class, 'index'])->name('admin.consultation-knowledge.index');
-        
-        // ナレッジ管理（旧記事管理システム）
-        Route::get('/articles', [ArticleController::class, 'index'])->name('admin.articles.index');
+        // 記事管理（ナレッジ管理）
+        Route::resource('articles', ArticleController::class);
     });
 });
 

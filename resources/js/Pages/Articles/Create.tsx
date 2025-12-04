@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AdminV2Layout from '@/Layouts/AdminV2Layout';
 import { Head, useForm, Link } from '@inertiajs/react';
 import { route } from 'ziggy-js';
 import Button from '@/Components/Button';
@@ -32,7 +32,7 @@ export default function Create() {
     };
 
     return (
-        <AuthenticatedLayout
+        <AdminV2Layout
             header={
                 <h2 className="text-xl font-semibold leading-tight text-gray-800">
                     記事登録
@@ -126,7 +126,7 @@ export default function Create() {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </AdminV2Layout>
     );
 }
 

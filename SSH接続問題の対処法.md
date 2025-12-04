@@ -1,7 +1,7 @@
 # SSH接続ができない問題の対処法
 
 ## 現在の状況
-- サーバーIP: 163.44.126.95
+- サーバー: さくらのレンタルサーバー（navyracoon2.sakura.ne.jp）
 - 接続: タイムアウト
 - Ping: 失敗（100%パケットロス）
 
@@ -9,20 +9,20 @@
 
 ### 1. サーバーがダウンしている
 **確認方法:**
-- サーバーの管理画面（ConoHa VPSなど）でサーバーの状態を確認
+- さくらのレンタルサーバーのコントロールパネルでサーバーの状態を確認
 - サーバーが起動しているか確認
 
 **対処法:**
-- サーバーを再起動する
+- さくらのレンタルサーバーのコントロールパネルからサーバーを再起動する
 
-### 2. サーバーのIPアドレスが変更された
+### 2. SSH接続設定の問題
 **確認方法:**
-- サーバー管理画面で現在のIPアドレスを確認
-- 以前のIPアドレスと比較
+- さくらのレンタルサーバーのコントロールパネルでSSH接続設定を確認
+- SSH接続が有効になっているか確認
 
 **対処法:**
-- `~/.ssh/config` のIPアドレスを更新
-- または、新しいホスト名を使用
+- `~/.ssh/config` の設定を確認・更新
+- または、直接接続を試す: `ssh [ユーザー名]@navyracoon2.sakura.ne.jp`
 
 ### 3. ファイアウォール設定
 **確認方法:**
@@ -49,8 +49,8 @@
 
 **対処法:**
 ```powershell
-# Windows PowerShellから
-ssh root@163.44.126.95 -i ~/.ssh/conoha_vps
+# Windows PowerShellから（ユーザー名は実際のものに置き換え）
+ssh [ユーザー名]@navyracoon2.sakura.ne.jp
 ```
 
 ## 一時的な対処法
@@ -77,13 +77,21 @@ php artisan config:cache && php artisan route:cache
 ## 接続テストコマンド
 
 ```bash
-# 基本接続テスト
-ssh -v conoha "echo '接続成功'"
+# 基本接続テスト（エイリアス使用）
+ssh -v sakura "echo '接続成功'"
+
+# 直接接続テスト
+ssh -v navyracoon2@navyracoon2.sakura.ne.jp "echo '接続成功'"
+
+# パスワード認証を使用する場合（sshpassが必要）
+sshpass -p 'パスワード' ssh -v navyracoon2@navyracoon2.sakura.ne.jp "echo '接続成功'"
 
 # タイムアウトを長めに設定
-ssh -o ConnectTimeout=30 conoha
+ssh -o ConnectTimeout=30 sakura
 
-# ポート番号を指定（もし変更されている場合）
-ssh -p 22 conoha
+# ポート番号を指定（さくらのレンタルサーバーの場合、通常は22）
+ssh -p 22 sakura
+# または
+ssh -p 22 navyracoon2@navyracoon2.sakura.ne.jp
 ```
 

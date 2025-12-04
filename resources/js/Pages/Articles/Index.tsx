@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AdminV2Layout from '@/Layouts/AdminV2Layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/Types';
 import { Article } from '@/Types';
@@ -22,7 +22,7 @@ export default function Index({ articles }: ArticlesIndexProps) {
     };
 
     return (
-        <AuthenticatedLayout
+        <AdminV2Layout
             header={
                 <h2 className="text-xl font-semibold leading-tight text-gray-800">
                     記事管理
@@ -165,6 +165,6 @@ export default function Index({ articles }: ArticlesIndexProps) {
                     </div>
                 </div>
             </div>
-        </AuthenticatedLayout>
+        </AdminV2Layout>
     );
 }
