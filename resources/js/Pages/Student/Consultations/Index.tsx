@@ -20,6 +20,7 @@ export default function Index({ consultations: initialConsultations, existing_co
     const flash = (page.props as any).flash || {};
     const [consultations, setConsultations] = useState(initialConsultations);
     const [isLoading, setIsLoading] = useState(false);
+    const [expandedAnswers, setExpandedAnswers] = useState<{[key: number]: boolean}>({});
 
     useEffect(() => {
         setConsultations(initialConsultations);
@@ -54,6 +55,21 @@ export default function Index({ consultations: initialConsultations, existing_co
                 setIsLoading(false);
             },
         });
+    };
+
+    // 回答を4セクションに分割
+    const splitAnswer = (answer: string) => {
+        const summaryMatch = answer.match(/【要約】\s*([\s\S]*?)(?=【今すぐやること】|【アドバイス】|【詳細】|$)/);
+        const actionMatch = answer.match(/【今すぐやること】\s*([\s\S]*?)(?=【アドバイス】|【詳細】|$)/);
+        const adviceMatch = answer.match(/【アドバイス】\s*([\s\S]*?)(?=【詳細】|$)/);
+        const detailMatch = answer.match(/【詳細】\s*([\s\S]*)/);
+        
+        return {
+            summary: summaryMatch ? summaryMatch[1].trim() : '',
+            action: actionMatch ? actionMatch[1].trim() : '',
+            advice: adviceMatch ? adviceMatch[1].trim() : '',
+            detail: detailMatch ? detailMatch[1].trim() : answer
+        };
     };
 
     return (
@@ -177,37 +193,201 @@ export default function Index({ consultations: initialConsultations, existing_co
                                                 {/* 回答（左側） */}
                                                 <div className="flex justify-start">
                                                     <div className="max-w-2xl bg-gray-100 rounded-lg p-4">
-                                                        <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
-                                                            <ReactMarkdown
-                                                                remarkPlugins={[remarkGfm]}
-                                                                components={{
-                                                                    code({node, inline, className, children, ...props}: any) {
-                                                                        const match = /language-(\w+)/.exec(className || '');
-                                                                        return !inline && match ? (
-                                                                            <SyntaxHighlighter
-                                                                                style={vscDarkPlus}
-                                                                                language={match[1]}
-                                                                                PreTag="div"
-                                                                                {...props}
+                                                        {(() => {
+                                                            const { summary, action, advice, detail } = splitAnswer(consultation.answer);
+                                                            const isExpanded = expandedAnswers[consultation.id] || false;
+                                                            
+                                                            return (
+                                                                <>
+                                                                    {/* 要約セクション */}
+                                                                    {summary && (
+                                                                        <div className="mb-3">
+                                                                            <div className="flex items-center mb-1">
+                                                                                <span className="font-bold text-sm text-blue-600">💡 要約</span>
+                                                                            </div>
+                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                                                                <ReactMarkdown
+                                                                                    remarkPlugins={[remarkGfm]}
+                                                                                    components={{
+                                                                                        code({node, inline, className, children, ...props}: any) {
+                                                                                            const match = /language-(\w+)/.exec(className || '');
+                                                                                            return !inline && match ? (
+                                                                                                <SyntaxHighlighter
+                                                                                                    style={vscDarkPlus}
+                                                                                                    language={match[1]}
+                                                                                                    PreTag="div"
+                                                                                                    {...props}
+                                                                                                >
+                                                                                                    {String(children).replace(/\n$/, '')}
+                                                                                                </SyntaxHighlighter>
+                                                                                            ) : (
+                                                                                                <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                                                                    {children}
+                                                                                                </code>
+                                                                                            );
+                                                                                        }
+                                                                                    }}
+                                                                                >
+                                                                                    {summary}
+                                                                                </ReactMarkdown>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* 今すぐやることセクション - 常に表示 */}
+                                                                    {action && (
+                                                                        <div className="mb-3 bg-yellow-50 border-l-4 border-yellow-400 p-3 rounded">
+                                                                            <div className="flex items-center mb-1">
+                                                                                <span className="font-bold text-sm text-yellow-700">✅ 今すぐやること</span>
+                                                                            </div>
+                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                                                                <ReactMarkdown
+                                                                                    remarkPlugins={[remarkGfm]}
+                                                                                    components={{
+                                                                                        code({node, inline, className, children, ...props}: any) {
+                                                                                            const match = /language-(\w+)/.exec(className || '');
+                                                                                            return !inline && match ? (
+                                                                                                <SyntaxHighlighter
+                                                                                                    style={vscDarkPlus}
+                                                                                                    language={match[1]}
+                                                                                                    PreTag="div"
+                                                                                                    {...props}
+                                                                                                >
+                                                                                                    {String(children).replace(/\n$/, '')}
+                                                                                                </SyntaxHighlighter>
+                                                                                            ) : (
+                                                                                                <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                                                                    {children}
+                                                                                                </code>
+                                                                                            );
+                                                                                        }
+                                                                                    }}
+                                                                                >
+                                                                                    {action}
+                                                                                </ReactMarkdown>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* アドバイスセクション - 常に表示 */}
+                                                                    {advice && (
+                                                                        <div className="mb-3 bg-green-50 border-l-4 border-green-400 p-3 rounded">
+                                                                            <div className="flex items-center mb-1">
+                                                                                <span className="font-bold text-sm text-green-700">💬 アドバイス</span>
+                                                                            </div>
+                                                                            <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                                                                <ReactMarkdown
+                                                                                    remarkPlugins={[remarkGfm]}
+                                                                                    components={{
+                                                                                        code({node, inline, className, children, ...props}: any) {
+                                                                                            const match = /language-(\w+)/.exec(className || '');
+                                                                                            return !inline && match ? (
+                                                                                                <SyntaxHighlighter
+                                                                                                    style={vscDarkPlus}
+                                                                                                    language={match[1]}
+                                                                                                    PreTag="div"
+                                                                                                    {...props}
+                                                                                                >
+                                                                                                    {String(children).replace(/\n$/, '')}
+                                                                                                </SyntaxHighlighter>
+                                                                                            ) : (
+                                                                                                <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                                                                    {children}
+                                                                                                </code>
+                                                                                            );
+                                                                                        }
+                                                                                    }}
+                                                                                >
+                                                                                    {advice}
+                                                                                </ReactMarkdown>
+                                                                            </div>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {/* 詳細セクション - 折りたたみ可能 */}
+                                                                    {detail && (
+                                                                        <>
+                                                                            <button
+                                                                                onClick={() => setExpandedAnswers({...expandedAnswers, [consultation.id]: !isExpanded})}
+                                                                                className="text-blue-600 text-sm hover:underline mb-2 flex items-center"
                                                                             >
-                                                                                {String(children).replace(/\n$/, '')}
-                                                                            </SyntaxHighlighter>
-                                                                        ) : (
-                                                                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
-                                                                                {children}
-                                                                            </code>
-                                                                        );
-                                                                    }
-                                                                }}
-                                                            >
-                                                                {consultation.answer}
-                                                            </ReactMarkdown>
-                                                        </div>
-                                                        {consultation.is_corrected && (
-                                                            <p className="text-xs text-orange-600 mt-2">
-                                                                ※この回答は修正されています
-                                                            </p>
-                                                        )}
+                                                                                {isExpanded ? '詳細を閉じる ▲' : '詳しく見る ▼'}
+                                                                            </button>
+                                                                            
+                                                                            {isExpanded && (
+                                                                                <div className="mt-2 pt-3 border-t border-gray-300">
+                                                                                    <div className="flex items-center mb-1">
+                                                                                        <span className="font-bold text-sm text-gray-600">📖 詳細</span>
+                                                                                    </div>
+                                                                                    <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                                                                        <ReactMarkdown
+                                                                                            remarkPlugins={[remarkGfm]}
+                                                                                            components={{
+                                                                                                code({node, inline, className, children, ...props}: any) {
+                                                                                                    const match = /language-(\w+)/.exec(className || '');
+                                                                                                    return !inline && match ? (
+                                                                                                        <SyntaxHighlighter
+                                                                                                            style={vscDarkPlus}
+                                                                                                            language={match[1]}
+                                                                                                            PreTag="div"
+                                                                                                            {...props}
+                                                                                                        >
+                                                                                                            {String(children).replace(/\n$/, '')}
+                                                                                                        </SyntaxHighlighter>
+                                                                                                    ) : (
+                                                                                                        <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                                                                            {children}
+                                                                                                        </code>
+                                                                                                    );
+                                                                                                }
+                                                                                            }}
+                                                                                        >
+                                                                                            {detail}
+                                                                                        </ReactMarkdown>
+                                                                                    </div>
+                                                                                </div>
+                                                                            )}
+                                                                        </>
+                                                                    )}
+                                                                    
+                                                                    {/* フォールバック: 4段階構造がない場合は従来通り表示 */}
+                                                                    {!summary && !action && !advice && !detail && (
+                                                                        <div className="prose prose-sm max-w-none prose-headings:font-bold prose-h1:text-xl prose-h2:text-lg prose-h3:text-base prose-p:text-gray-700 prose-a:text-blue-600 prose-strong:text-gray-900">
+                                                                            <ReactMarkdown
+                                                                                remarkPlugins={[remarkGfm]}
+                                                                                components={{
+                                                                                    code({node, inline, className, children, ...props}: any) {
+                                                                                        const match = /language-(\w+)/.exec(className || '');
+                                                                                        return !inline && match ? (
+                                                                                            <SyntaxHighlighter
+                                                                                                style={vscDarkPlus}
+                                                                                                language={match[1]}
+                                                                                                PreTag="div"
+                                                                                                {...props}
+                                                                                            >
+                                                                                                {String(children).replace(/\n$/, '')}
+                                                                                            </SyntaxHighlighter>
+                                                                                        ) : (
+                                                                                            <code className="bg-gray-100 px-1 py-0.5 rounded text-sm" {...props}>
+                                                                                                {children}
+                                                                                            </code>
+                                                                                        );
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                {consultation.answer}
+                                                                            </ReactMarkdown>
+                                                                        </div>
+                                                                    )}
+                                                                    
+                                                                    {consultation.is_corrected && (
+                                                                        <p className="text-xs text-orange-600 mt-2">
+                                                                            ※この回答は修正されています
+                                                                        </p>
+                                                                    )}
+                                                                </>
+                                                            );
+                                                        })()}
                                                     </div>
                                                 </div>
                                             </div>
