@@ -82,7 +82,7 @@ class ConsultationController extends Controller
 
             // セッションに新しい相談を追加（リダイレクト直後に確実に表示されるように）
             return redirect()->route('student.consultations.index')
-                ->with('warning', '⚠️ この質問は過去に同じ質問があります。既存の回答を表示しています。')
+                ->with('warning', 'この質問は過去に同じ質問があります。既存の回答を表示しています。')
                 ->with('new_consultation', $newConsultation);
         }
 
