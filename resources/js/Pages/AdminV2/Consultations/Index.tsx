@@ -196,7 +196,7 @@ export default function Index({ consultations }: AdminConsultationsIndexProps) {
 
                         <div className="mb-4">
                             <InputLabel htmlFor="original_answer" value="元の回答" />
-                            <div className="mt-1 p-3 bg-yellow-50 rounded-md border border-yellow-300">
+                            <div className="mt-1 p-3 bg-yellow-50 rounded-md border border-yellow-300 max-h-96 overflow-y-auto">
                                 <p className="text-sm text-gray-700 whitespace-pre-wrap">
                                     {selectedConsultation.answer}
                                 </p>

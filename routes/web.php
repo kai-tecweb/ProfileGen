@@ -70,6 +70,9 @@ Route::prefix('admin')->group(function () {
         Route::get('/consultations', [AdminV2ConsultationController::class, 'index'])->name('admin.consultations.index');
         Route::post('/consultations/{consultation}/correct', [AdminV2ConsultationController::class, 'correct'])->name('admin.consultations.correct');
         Route::post('/consultations/{consultation}/notify', [AdminV2ConsultationController::class, 'notifyDiscord'])->name('admin.consultations.notify');
+        
+        // ナレッジ管理
+        Route::get('/articles', [ArticleController::class, 'index'])->name('admin.articles.index');
     });
 });
 

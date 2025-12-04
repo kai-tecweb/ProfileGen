@@ -14,11 +14,9 @@ export default function AdminV2Layout({
                     <div className="flex h-16 justify-between">
                         <div className="flex">
                             <div className="flex shrink-0 items-center">
-                                <Link href="/">
-                                    <span className="text-xl font-bold text-gray-800">
-                                        ProfileGen - 管理エリア
-                                    </span>
-                                </Link>
+                                <span className="text-xl font-bold text-gray-800">
+                                    ProfileGen - 管理エリア
+                                </span>
                             </div>
 
                             <div className="hidden space-x-8 sm:-my-px sm:ms-10 sm:flex">
@@ -27,6 +25,12 @@ export default function AdminV2Layout({
                                     className="inline-flex items-center px-1 pt-1 text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-indigo-700 transition duration-150 ease-in-out"
                                 >
                                     相談履歴管理
+                                </Link>
+                                <Link
+                                    href={route('admin.articles.index')}
+                                    className="inline-flex items-center px-1 pt-1 text-sm font-medium leading-5 text-gray-900 focus:outline-none focus:border-indigo-700 transition duration-150 ease-in-out"
+                                >
+                                    ナレッジ管理
                                 </Link>
                             </div>
                         </div>
