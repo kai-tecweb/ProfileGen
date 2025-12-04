@@ -5,6 +5,7 @@ import { route } from 'ziggy-js';
 import Button from '@/Components/Button';
 import LoadingSpinner from '@/Components/LoadingSpinner';
 import { useState, useEffect } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 interface ConsultationsIndexProps {
     consultations: Consultation[];
@@ -173,9 +174,11 @@ export default function Index({ consultations: initialConsultations, existing_co
                                                 {/* 回答（左側） */}
                                                 <div className="flex justify-start">
                                                     <div className="max-w-2xl bg-gray-100 rounded-lg p-4">
-                                                        <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                                            {consultation.answer}
-                                                        </p>
+                                                        <div className="text-sm text-gray-700 prose prose-sm max-w-none">
+                                                            <ReactMarkdown>
+                                                                {consultation.answer}
+                                                            </ReactMarkdown>
+                                                        </div>
                                                         {consultation.is_corrected && (
                                                             <p className="text-xs text-orange-600 mt-2">
                                                                 ※この回答は修正されています

@@ -1,4 +1,4 @@
-import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import AdminV2Layout from '@/Layouts/AdminV2Layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { PageProps, Consultation } from '@/Types';
 import { route } from 'ziggy-js';
@@ -7,6 +7,7 @@ import Modal from '@/Components/Modal';
 import InputLabel from '@/Components/InputLabel';
 import InputError from '@/Components/InputError';
 import { useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 
 interface AdminConsultationsIndexProps extends PageProps {
     consultations: {
@@ -57,7 +58,7 @@ export default function Index({ consultations }: AdminConsultationsIndexProps) {
     };
 
     return (
-        <AuthenticatedLayout
+        <AdminV2Layout
             header={
                 <h2 className="text-xl font-semibold leading-tight text-gray-800">
                     相談履歴管理
@@ -196,10 +197,12 @@ export default function Index({ consultations }: AdminConsultationsIndexProps) {
 
                         <div className="mb-4">
                             <InputLabel htmlFor="original_answer" value="元の回答" />
-                            <div className="mt-1 p-3 bg-yellow-50 rounded-md border border-yellow-300">
-                                <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                                    {selectedConsultation.answer}
-                                </p>
+                            <div className="mt-1 p-3 bg-yellow-50 rounded-md border border-yellow-300 max-h-96 overflow-y-auto">
+                                <div className="text-sm text-gray-700 prose prose-sm max-w-none">
+                                    <ReactMarkdown>
+                                        {selectedConsultation.answer}
+                                    </ReactMarkdown>
+                                </div>
                             </div>
                         </div>
 
@@ -245,7 +248,7 @@ export default function Index({ consultations }: AdminConsultationsIndexProps) {
                     </form>
                 )}
             </Modal>
-        </AuthenticatedLayout>
+        </AdminV2Layout>
     );
 }
 
