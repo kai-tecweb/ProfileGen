@@ -10,6 +10,7 @@ use App\Http\Controllers\Student\AuthController as StudentAuthController;
 use App\Http\Controllers\Student\ConsultationController as StudentConsultationController;
 use App\Http\Controllers\AdminV2\AuthController as AdminV2AuthController;
 use App\Http\Controllers\AdminV2\ConsultationController as AdminV2ConsultationController;
+use App\Http\Controllers\Admin\ConsultationKnowledgeController;
 use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -71,7 +72,10 @@ Route::prefix('admin')->group(function () {
         Route::post('/consultations/{consultation}/correct', [AdminV2ConsultationController::class, 'correct'])->name('admin.consultations.correct');
         Route::post('/consultations/{consultation}/notify', [AdminV2ConsultationController::class, 'notifyDiscord'])->name('admin.consultations.notify');
         
-        // ナレッジ管理
+        // 相談チャット用ナレッジ管理
+        Route::get('/consultation-knowledge', [ConsultationKnowledgeController::class, 'index'])->name('admin.consultation-knowledge.index');
+        
+        // ナレッジ管理（旧記事管理システム）
         Route::get('/articles', [ArticleController::class, 'index'])->name('admin.articles.index');
     });
 });
